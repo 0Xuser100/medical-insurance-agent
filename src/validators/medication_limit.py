@@ -42,12 +42,13 @@ class MedicationLimitValidator(BaseValidator):
         Check if the prescription exceeds the medication limit.
 
         Args:
-            data: Extracted OCR input data
+            data: Extracted OCR input data (raw dict from Gemini)
 
         Returns:
             List with a single result indicating limit status
         """
-        medication_count = len(data.medications)
+        medications = data.get("medications", [])
+        medication_count = len(medications)
 
         if medication_count <= self.limit:
             # Within limit - no action needed

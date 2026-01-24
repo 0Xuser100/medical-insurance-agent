@@ -6,13 +6,16 @@ Uses Google GenAI (Gemini) to extract prescription data from images/PDFs.
 SOLID: Single Responsibility - only handles OCR extraction.
 """
 
+import asyncio
 import json
 import os
 import re
 from pathlib import Path
 
+import aiofiles
 from google import genai
 from google.genai import types
+from loguru import logger
 
 from src.models.schemas import ExtractedOCRInput
 
@@ -28,27 +31,9 @@ def _repair_json(text: str) -> str:
 
 
 EXTRACTION_PROMPT = """
-You are a medical prescription OCR extraction system. Analyze this prescription image/PDF and extract the following information as JSON.
-
-Return ONLY valid JSON with this exact structure:
-{
-    "patient_name": "string - patient full name",
-    "age": number - patient age (integer),
-    "gender": "string - Male or Female",
-    "diagnosis": "string - primary diagnosis description",
-    "icd_code": "string - ICD-10 code if visible, otherwise infer from diagnosis (e.g., J20.9 for Acute Bronchitis)",
-    "provider_id": "string - doctor/provider ID if visible, otherwise generate as DR-XXXXX",
-    "medications": ["array of medication names with dosage"]
-}
-
-CRITICAL RULES:
-- Return ONLY valid JSON - no markdown, no explanations, no extra text
-- Extract ALL medications listed with their dosages
-- If a field is not visible, make a reasonable inference or use placeholder
-- Ensure age is a number, not a string
-- Do NOT use trailing commas in arrays or objects
-- Use double quotes for all strings, never single quotes
-- Only extract what is actually visible in the prescription
+Analyze the provided medical prescription image and extract all visible data.
+Return ONLY a valid JSON object containing the extracted information.
+No markdown, no triple backticks, no explanations.
 """
 
 
@@ -72,19 +57,24 @@ class ExtractionService:
     SOLID: Single Responsibility - OCR extraction only.
     """
 
-    def __init__(self, model: str = "gemini-2.0-flash"):
+    def __init__(self, model: str | None = None):
         """
         Initialize extraction service.
 
+        Uses Gemini API with API key authentication.
+        Requires:
+            - GEMINI_API_KEY: Gemini API key
+
         Args:
-            model: Gemini model to use for extraction
+            model: Gemini model to use for extraction (default from GEMINI_MODEL_NAME env)
         """
-        api_key = os.environ.get("GOOGLE_CLOUD_API_KEY")
+        api_key = os.environ.get("GEMINI_API_KEY")
         if not api_key:
-            raise ValueError("GOOGLE_CLOUD_API_KEY environment variable not set")
+            raise ValueError("GEMINI_API_KEY environment variable not set")
 
         self.client = genai.Client(api_key=api_key)
-        self.model = model
+        self.model = model or os.environ.get("GEMINI_MODEL_NAME", "gemini-3-flash-preview")
+        logger.info(f"ExtractionService initialized with model: {self.model}")
 
     def _get_mime_type(self, file_path: Path) -> str:
         """Get MIME type from file extension."""
@@ -93,6 +83,84 @@ class ExtractionService:
         if not mime_type:
             raise ValueError(f"Unsupported file type: {ext}")
         return mime_type
+
+    def _extract_sync(self, file_path: Path, save_path: Path | None = None) -> dict:
+        """
+        Synchronous extraction - runs in a thread pool to avoid blocking.
+
+        This mirrors the working test_gemini.py implementation.
+        """
+        logger.info(f"Starting sync extraction from file: {file_path}")
+
+        # 1. Load file bytes
+        with open(file_path, "rb") as f:
+            file_bytes = f.read()
+        logger.debug(f"Loaded file bytes: {len(file_bytes)} bytes")
+
+        # 2. Get MIME type
+        mime_type = self._get_mime_type(file_path)
+        logger.debug(f"MIME type: {mime_type}")
+
+        # 3. Create fresh client (avoids thread-safety issues with reused client)
+        api_key = os.environ.get("GEMINI_API_KEY")
+        client = genai.Client(api_key=api_key)
+
+        # 4. Call Gemini with image + prompt (sync)
+        logger.info(f"Sending to Gemini model: {self.model}")
+        response = client.models.generate_content(
+            model=self.model,
+            contents=[
+                types.Content(
+                    role="user",
+                    parts=[
+                        types.Part.from_bytes(data=file_bytes, mime_type=mime_type),
+                        types.Part.from_text(text=EXTRACTION_PROMPT),
+                    ],
+                )
+            ],
+            config=types.GenerateContentConfig(
+                temperature=0,
+                response_mime_type="application/json",
+            ),
+        )
+        logger.info("Received response from Gemini")
+
+        # 5. Parse JSON response
+        json_text = response.text.strip()
+        logger.debug(f"Raw response length: {len(json_text)} chars")
+
+        # Remove markdown code blocks if present
+        if json_text.startswith("```"):
+            lines = json_text.split("\n")
+            json_text = "\n".join(lines[1:-1])
+            logger.debug("Removed markdown code blocks from response")
+
+        # Try parsing, with repair fallback
+        try:
+            data = json.loads(json_text)
+            logger.info("Successfully parsed JSON response")
+        except json.JSONDecodeError:
+            logger.warning("JSON parse failed, attempting repair")
+            repaired = _repair_json(json_text)
+            try:
+                data = json.loads(repaired)
+                logger.info("Successfully parsed repaired JSON")
+            except json.JSONDecodeError as e:
+                logger.error(f"Failed to parse Gemini response: {e}")
+                logger.error(f"Raw response (first 500 chars): {json_text[:500]}")
+                raise ValueError(
+                    f"Failed to parse Gemini response as JSON: {e}\n"
+                    f"Raw response (first 500 chars): {json_text[:500]}"
+                ) from e
+
+        # 6. Save to disk if path provided
+        if save_path:
+            with open(save_path, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+            logger.info(f"Saved extracted data to: {save_path}")
+
+        logger.info(f"Extraction complete. Data keys: {list(data.keys())}")
+        return data
 
     async def extract_from_file(
         self,
@@ -113,60 +181,5 @@ class ExtractionService:
             ValueError: If file type is unsupported
             Exception: If extraction fails
         """
-        # 1. Load file bytes
-        with open(file_path, "rb") as f:
-            file_bytes = f.read()
-
-        # 2. Get MIME type
-        mime_type = self._get_mime_type(file_path)
-
-        # 3. Call Gemini with image + prompt
-        response = self.client.models.generate_content(
-            model=self.model,
-            contents=[
-                types.Content(
-                    role="user",
-                    parts=[
-                        types.Part.from_bytes(data=file_bytes, mime_type=mime_type),
-                        types.Part.from_text(text=EXTRACTION_PROMPT),
-                    ],
-                )
-            ],
-            config=types.GenerateContentConfig(
-                temperature=0.1,  # Low for accuracy
-                max_output_tokens=4096,
-                response_mime_type="application/json",  # Force JSON output
-            ),
-        )
-
-        # 4. Parse JSON response
-        json_text = response.text.strip()
-
-        # Remove markdown code blocks if present
-        if json_text.startswith("```"):
-            lines = json_text.split("\n")
-            # Remove first line (```json) and last line (```)
-            json_text = "\n".join(lines[1:-1])
-
-        # Try parsing, with repair fallback
-        try:
-            data = json.loads(json_text)
-        except json.JSONDecodeError:
-            # Try repairing common JSON issues
-            repaired = _repair_json(json_text)
-            try:
-                data = json.loads(repaired)
-            except json.JSONDecodeError as e:
-                # Log the raw response for debugging
-                raise ValueError(
-                    f"Failed to parse Gemini response as JSON: {e}\n"
-                    f"Raw response (first 500 chars): {json_text[:500]}"
-                ) from e
-
-        # 5. Save to disk if path provided
-        if save_path:
-            with open(save_path, "w", encoding="utf-8") as f:
-                json.dump(data, f, indent=2, ensure_ascii=False)
-
-        # 6. Return as Pydantic model
-        return ExtractedOCRInput(**data)
+        # Run sync extraction in thread pool to avoid blocking event loop
+        return await asyncio.to_thread(self._extract_sync, file_path, save_path)

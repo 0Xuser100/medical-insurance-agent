@@ -1,0 +1,44 @@
+{
+  "doctor_info": {
+    "name": "Dr. Wael Hatem El Taei",
+    "specialization": "Consultant Pediatrician and Neonatologist",
+    "qualifications": [
+      "PhD in Childhood Studies, Ain Shams University",
+      "Professor of Child Health, National Research Centre"
+    ],
+    "contact": {
+      "phone_numbers": [
+        "01008895351",
+        "01063703736",
+        "01006856000"
+      ],
+      "facebook": "Dr Wael Hatem El Taei Clinic"
+    }
+  },
+  "patient_info": {
+    "name": "Omar Mohamed Hatem",
+    "date": "4/1/2024",
+    "age": "6.5 years",
+    "weight": "24 kg",
+    "height": "120 cm"
+  },
+  "prescription": [
+    {
+      "medication": "Azulast phys N. spray",
+      "instructions": "One puff three times daily for one week"
+    },
+    {
+      "medication": "Lelipel syrup",
+      "instructions": "5 ml twice daily for one week"
+    },
+    {
+      "category": "Home Nebulizer/Spray",
+      "medications": [
+        "Chicks saline",
+        "Loxyine Jr"
+      ],
+      "instructions": "10 ml three times daily for one week"
+    }
+  ],
+  "notes": "Consultation within one week from the date of examination"
+}

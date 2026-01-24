@@ -77,14 +77,14 @@ def get_report_builder() -> ReportBuilder:
 @lru_cache
 def get_validation_crew() -> ValidationCrew:
     """
-    Get or create the validation crew.
+    Get or create the multi-agent validation crew.
 
     SOLID: Dependency Inversion
-    - ValidationCrew depends on abstractions (services)
-    - Services are injected via constructor
+    - ValidationCrew depends on ReportBuilder for final output
+    - Three specialized agents handle validation independently
+    - Pydantic validation happens only at report building stage
     """
     return ValidationCrew(
-        validation_service=get_validation_service(),
         report_builder=get_report_builder(),
     )
 

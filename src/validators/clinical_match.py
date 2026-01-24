@@ -1,7 +1,7 @@
 """
 Clinical Match Validator - Guardrail 1.
 
-Validates that medications and labs align with the diagnosis.
+Validates that medications align with the diagnosis.
 
 SOLID: Single Responsibility - only handles clinical matching.
 """
@@ -9,6 +9,8 @@ SOLID: Single Responsibility - only handles clinical matching.
 import json
 from pathlib import Path
 from typing import Any
+
+from loguru import logger
 
 from src.models.schemas import (
     ExtractedOCRInput,
@@ -109,28 +111,41 @@ class ClinicalMatchValidator(BaseValidator):
 
         return False, reason_en, reason_ar
 
+    def _extract_medication_name(self, medication: str | dict) -> str:
+        """Extract medication name from string or dict format."""
+        if isinstance(medication, dict):
+            return medication.get("name", str(medication))
+        return medication
+
     async def validate(self, data: ExtractedOCRInput) -> list[ValidationResult]:
         """
-        Validate all medications and labs against the diagnosis.
+        Validate all medications against the diagnosis.
 
         Args:
-            data: Extracted OCR input data
+            data: Extracted OCR input data (raw dict from Gemini)
 
         Returns:
-            List of validation results for each item
+            List of validation results for each medication
         """
+        # Extract fields with fallbacks
+        medications = data.get("medications", [])
+        icd_code = data.get("icd_code", "")
+
+        logger.info(f"ClinicalMatchValidator: Validating {len(medications)} medications for ICD: {icd_code}")
         results: list[ValidationResult] = []
 
-        # Validate medications
-        for medication in data.medications:
+        # Validate medications only
+        for medication in medications:
+            med_name = self._extract_medication_name(medication)
             is_valid, reason_en, reason_ar = self._is_valid_for_diagnosis(
-                medication, data.icd_code, ItemType.MEDICATION
+                med_name, icd_code, ItemType.MEDICATION
             )
 
             if is_valid:
+                logger.debug(f"Medication '{med_name}' APPROVED for {icd_code}")
                 results.append(
                     ValidationResult(
-                        item_name=medication,
+                        item_name=med_name,
                         item_type=ItemType.MEDICATION,
                         status=ItemStatus.APPROVED,
                         risk_level=RiskLevel.LOW,
@@ -139,9 +154,10 @@ class ClinicalMatchValidator(BaseValidator):
                     )
                 )
             else:
+                logger.warning(f"Medication '{med_name}' FLAGGED: {reason_en}")
                 results.append(
                     ValidationResult(
-                        item_name=medication,
+                        item_name=med_name,
                         item_type=ItemType.MEDICATION,
                         status=ItemStatus.FLAGGED,
                         risk_level=RiskLevel.HIGH,
@@ -152,36 +168,5 @@ class ClinicalMatchValidator(BaseValidator):
                     )
                 )
 
-        # Validate labs
-        for lab in data.labs:
-            is_valid, reason_en, reason_ar = self._is_valid_for_diagnosis(
-                lab, data.icd_code, ItemType.LAB_ANALYSIS
-            )
-
-            if is_valid:
-                results.append(
-                    ValidationResult(
-                        item_name=lab,
-                        item_type=ItemType.LAB_ANALYSIS,
-                        status=ItemStatus.APPROVED,
-                        risk_level=RiskLevel.LOW,
-                        clinical_match=True,
-                        duration_check="N/A (Lab test)",
-                        guardrail=self.name,
-                    )
-                )
-            else:
-                results.append(
-                    ValidationResult(
-                        item_name=lab,
-                        item_type=ItemType.LAB_ANALYSIS,
-                        status=ItemStatus.FLAGGED,
-                        risk_level=RiskLevel.MEDIUM,
-                        clinical_match=False,
-                        reason_en=reason_en,
-                        reason_ar=reason_ar,
-                        guardrail=self.name,
-                    )
-                )
-
+        logger.info(f"ClinicalMatchValidator: Completed. {len(results)} results")
         return results

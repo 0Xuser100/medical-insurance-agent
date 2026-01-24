@@ -6,10 +6,18 @@ Based on the JSON schema defined in README.md.
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
+from typing import Any, Optional
 from uuid import uuid4
 
 from pydantic import BaseModel, Field
+
+
+# ============================================================================
+# Type Aliases
+# ============================================================================
+
+# Flexible type for Gemini OCR output - accepts any dict structure
+ExtractedOCRInput = dict[str, Any]
 
 
 # ============================================================================
@@ -54,36 +62,8 @@ class OverallStatus(str, Enum):
 # Input Models
 # ============================================================================
 
-
-class ExtractedOCRInput(BaseModel):
-    """
-    Input from OCR extraction.
-
-    This is the data extracted from prescription images via Gemini API.
-    Only fields visible in the prescription are extracted.
-    """
-
-    patient_name: str = Field(..., description="Patient full name")
-    age: int = Field(..., ge=0, le=150, description="Patient age")
-    gender: str = Field(..., description="Patient gender")
-    diagnosis: str = Field(..., description="Primary diagnosis description")
-    icd_code: str = Field(..., description="ICD-10 code for diagnosis")
-    provider_id: str = Field(..., description="Healthcare provider ID")
-    medications: list[str] = Field(
-        default_factory=list, description="List of prescribed medications"
-    )
-
-    model_config = {"json_schema_extra": {
-        "example": {
-            "patient_name": "Ahmed Hassan",
-            "age": 45,
-            "gender": "Male",
-            "diagnosis": "Acute Bronchitis",
-            "icd_code": "J20.9",
-            "provider_id": "DR-5501",
-            "medications": ["Azithromycin 500mg", "Propranolol", "Panadol Extra"],
-        }
-    }}
+# NOTE: ExtractedOCRInput is defined above as a type alias (dict[str, Any])
+# This allows Gemini to return any structure without validation constraints.
 
 
 # ============================================================================

@@ -6,6 +6,8 @@ Builds the final JSON response from validation results.
 SOLID: Single Responsibility - only builds reports.
 """
 
+from loguru import logger
+
 from src.models.schemas import (
     AIValidationEngine,
     ExtractedContext,
@@ -147,6 +149,7 @@ class ReportBuilder:
         data: ExtractedOCRInput,
         validation_results: list[ValidationResult],
         success_rate: float,
+        job_id: str,
     ) -> PrescriptionValidationResponse:
         """
         Build the complete prescription validation response.
@@ -155,13 +158,17 @@ class ReportBuilder:
             data: Original extracted OCR input
             validation_results: Results from all validators
             success_rate: Percentage of approved items (0.0 to 1.0)
+            job_id: Job ID to use as patient ID (PAT-xxx format)
 
         Returns:
             Complete prescription validation response
         """
+        logger.info(f"ReportBuilder: Building report for job {job_id}")
+
         # Merge results for same items
         merged_results = self._merge_results_by_item(validation_results)
         results_list = list(merged_results.values())
+        logger.debug(f"Merged {len(validation_results)} results into {len(results_list)} unique items")
 
         # Build line items
         line_items: list[LineItem] = []
@@ -195,26 +202,44 @@ class ReportBuilder:
                 overall_status = OverallStatus.REVIEW_NEEDED
                 break
 
-        # Build response
+        logger.info(f"ReportBuilder: Overall status = {overall_status.value}, Success rate = {success_rate:.2%}")
+
+        # Extract fields with fallbacks (Gemini may use different field names)
+        patient_name = data.get("patient_name") or data.get("patient_information", {}).get("name", "Unknown")
+        age = data.get("age") or data.get("patient_information", {}).get("age", 0)
+        gender = data.get("gender") or data.get("patient_information", {}).get("gender", "Unknown")
+        diagnosis = data.get("diagnosis") or data.get("primary_diagnosis", "Unknown")
+        icd_code = data.get("icd_code", "")
+        provider_id = data.get("provider_id") or data.get("doctor_information", {}).get("id", "Unknown")
+        medications = data.get("medications", [])
+
+        # Ensure age is an integer
+        if isinstance(age, str):
+            try:
+                age = int(age.split()[0])  # Handle "45 years" format
+            except (ValueError, IndexError):
+                age = 0
+
+        # Build response - use job_id as patient_id
         return PrescriptionValidationResponse(
             patient_profile=PatientProfile(
-                id=data.patient_id,
-                name=data.patient_name,
-                age=data.age,
-                gender=data.gender,
-                insurance_tier=data.insurance_tier,
+                id=job_id,  # Use job_id (PAT-xxx) as patient ID
+                name=patient_name,
+                age=age,
+                gender=gender,
+                insurance_tier="Unknown",  # Not extracted from prescription
                 history_summary="",  # Not available in MVP
             ),
             extracted_context=ExtractedContext(
-                primary_diagnosis=data.diagnosis,
-                icd_code=data.icd_code,
-                provider_id=data.provider_id,
+                primary_diagnosis=diagnosis,
+                icd_code=icd_code,
+                provider_id=provider_id,
             ),
             ai_validation_engine=AIValidationEngine(
                 overall_status=overall_status,
                 confidence_score=success_rate,
                 summary_message=self._generate_summary_message(results_list, success_rate),
-                medication_count=len(data.medications),
+                medication_count=len(medications),
                 line_items=line_items,
             ),
         )

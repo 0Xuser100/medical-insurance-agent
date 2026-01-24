@@ -10,6 +10,8 @@ SOLID: Dependency Inversion - depends on injected services.
 import asyncio
 from pathlib import Path
 
+from loguru import logger
+
 from src.agents.validation_crew import ValidationCrew
 from src.models.schemas import JobStatus
 from src.services.extraction_service import ExtractionService
@@ -51,8 +53,10 @@ class ProcessingService:
 
     async def _process_job(self, job: Job) -> None:
         """Process a single job in background."""
+        logger.info(f"ProcessingService: Starting job {job.id}")
         try:
-            # Phase 1: Extraction
+            # Phase 1: Extraction (Gemini OCR)
+            logger.info(f"Job {job.id}: Phase 1 - Extraction starting")
             job.mark_extracting()
             self.job_store.update_job(job)
 
@@ -61,18 +65,25 @@ class ProcessingService:
                 file_path=job.file_path,
                 save_path=save_path,
             )
+            medications = extracted_data.get("medications", [])
+            logger.info(f"Job {job.id}: Extraction complete - {len(medications)} medications found")
 
-            # Phase 2: Validation
+            # Phase 2: Validation (Agent waits for extraction to complete)
+            logger.info(f"Job {job.id}: Phase 2 - Validation starting")
             job.mark_validating()
             job.extracted_data = extracted_data
             self.job_store.update_job(job)
 
-            result = await self.validation_crew.validate_prescription(extracted_data)
+            # Pass job_id to validation crew for use as patient_id
+            result = await self.validation_crew.validate_prescription(extracted_data, job_id=job.id)
+            logger.info(f"Job {job.id}: Validation complete - Status: {result.ai_validation_engine.overall_status.value}")
 
             job.mark_completed(extracted_data=extracted_data, result=result)
             self.job_store.update_job(job)
+            logger.info(f"Job {job.id}: Processing completed successfully")
 
         except Exception as e:
+            logger.error(f"Job {job.id}: Processing failed - {str(e)}")
             job.mark_failed(str(e))
             self.job_store.update_job(job)
 
@@ -83,14 +94,18 @@ class ProcessingService:
         """Start processing a job in background."""
         job = self.job_store.get_job(job_id)
         if not job:
+            logger.warning(f"ProcessingService: Job {job_id} not found")
             return False
 
         if job.status != JobStatus.UPLOADED:
+            logger.warning(f"ProcessingService: Job {job_id} not in UPLOADED status (current: {job.status})")
             return False
 
         if job_id in self._running_tasks:
+            logger.warning(f"ProcessingService: Job {job_id} already running")
             return False
 
+        logger.info(f"ProcessingService: Starting background task for job {job_id}")
         task = asyncio.create_task(self._process_job(job))
         self._running_tasks[job_id] = task
 
@@ -100,6 +115,7 @@ class ProcessingService:
         """Cancel a running job."""
         task = self._running_tasks.get(job_id)
         if task and not task.done():
+            logger.info(f"ProcessingService: Cancelling job {job_id}")
             task.cancel()
             return True
         return False
