@@ -268,17 +268,17 @@ class ResultResponse(BaseModel):
     job_id: str = Field(..., description="Job identifier")
     status: JobStatus = Field(..., description="Current job status")
     created_at: datetime = Field(..., description="Job creation timestamp")
-    started_at: Optional[datetime] = Field(
+    started_at: datetime = Field(
         default=None, description="Processing start timestamp"
     )
-    completed_at: Optional[datetime] = Field(
+    completed_at: datetime = Field(
         default=None, description="Processing completion timestamp"
     )
-    error: Optional[str] = Field(default=None, description="Error message if failed")
+    signal: Optional[str] = Field(default=None, description="Signal if failed")
     extracted_data: Optional[ExtractedOCRInput] = Field(
         default=None, description="Extracted OCR data from image/PDF"
     )
-    result: Optional[PrescriptionValidationResponse] = Field(
+    result: PrescriptionValidationResponse = Field(
         default=None, description="Validation result if completed"
     )
 
@@ -289,7 +289,7 @@ class ResultResponse(BaseModel):
             "created_at": "2026-01-24T15:54:29.873Z",
             "started_at": "2026-01-24T15:54:29.873Z",
             "completed_at": "2026-01-24T15:54:29.873Z",
-            "error": None,
+            "signal": None,
             "extracted_data": {
                 "medications": [
                     {"name": "Azulast phys N. spray", "dosage": "One puff...", "duration": "One month"}
