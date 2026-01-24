@@ -82,10 +82,13 @@ def clinical_match_check(medication_name: str) -> str:
 
 
 @tool("medication_limit_check")
-def medication_limit_check() -> str:
+def medication_limit_check(medication_count: Any = None) -> str:
     """
     Check if prescription exceeds the 5 medication limit.
     Use this once to verify policy compliance.
+
+    Args:
+        medication_count: Optional/Ignored. The tool calculates count internally.
     """
     global _prescription_context, _validation_results
 
@@ -145,15 +148,26 @@ def medication_duration_check(medication_name: str) -> str:
 
 
 def _extract_medications(context: dict) -> List[str]:
-    """Extract medication names from context."""
+    """Extract medication names from context, including nested components."""
     medications = []
+
+    def _add_item(item: Any):
+        if isinstance(item, dict):
+            # Handle nested components (e.g., Nebulizer components)
+            if "components" in item and isinstance(item["components"], list):
+                for comp in item["components"]:
+                    medications.append(str(comp))
+            # Handle regular medication object
+            elif "name" in item:
+                medications.append(item["name"])
+            else:
+                medications.append(str(item))
+        else:
+            medications.append(str(item))
 
     if "medications" in context:
         for med in context["medications"]:
-            if isinstance(med, dict):
-                medications.append(med.get("name", str(med)))
-            else:
-                medications.append(str(med))
+            _add_item(med)
 
     if "prescription" in context:
         for item in context["prescription"]:
@@ -161,9 +175,12 @@ def _extract_medications(context: dict) -> List[str]:
                 if "medication" in item:
                     medications.append(item["medication"])
                 if "medications" in item:
-                    medications.extend(item["medications"])
+                    # Handle list of medications inside a prescription item
+                    if isinstance(item["medications"], list):
+                        for m in item["medications"]:
+                            _add_item(m)
 
-    return medications
+    return list(set(medications))  # Return unique list
 
 
 # ============================================================================

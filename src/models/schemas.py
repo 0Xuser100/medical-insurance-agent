@@ -281,3 +281,43 @@ class ResultResponse(BaseModel):
     result: Optional[PrescriptionValidationResponse] = Field(
         default=None, description="Validation result if completed"
     )
+
+    model_config = {"json_schema_extra": {
+        "example": {
+            "job_id": "PAT-1234567890AB",
+            "status": "COMPLETED",
+            "created_at": "2026-01-24T15:54:29.873Z",
+            "started_at": "2026-01-24T15:54:29.873Z",
+            "completed_at": "2026-01-24T15:54:29.873Z",
+            "error": None,
+            "extracted_data": {
+                "medications": [
+                    {"name": "Azulast phys N. spray", "dosage": "One puff...", "duration": "One month"}
+                ]
+            },
+            "result": {
+                "transaction_id": "REQ-2024-8859",
+                "timestamp": "2024-05-21T10:30:00Z",
+                "patient_profile": {
+                    "id": "PAT-10023",
+                    "name": "Ahmed Hassan",
+                    "age": 45,
+                    "gender": "Male",
+                    "insurance_tier": "Gold",
+                    "history_summary": "",
+                },
+                "extracted_context": {
+                    "primary_diagnosis": "Acute Bronchitis",
+                    "icd_code": "J20.9",
+                    "provider_id": "DR-5501",
+                },
+                "ai_validation_engine": {
+                    "overall_status": "REVIEW_NEEDED",
+                    "confidence_score": 0.75,
+                    "summary_message": "Request partially approved.",
+                    "medication_count": 3,
+                    "line_items": [],
+                },
+            }
+        }
+    }}
