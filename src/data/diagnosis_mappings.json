@@ -1,0 +1,144 @@
+{
+  "J20.9": {
+    "name": "Acute Bronchitis",
+    "name_ar": "التهاب الشعب الهوائية الحاد",
+    "valid_medications": [
+      "Azithromycin",
+      "Amoxicillin",
+      "Dextromethorphan",
+      "Panadol",
+      "Panadol Extra",
+      "Acetaminophen",
+      "Ibuprofen",
+      "Guaifenesin",
+      "Benzonatate"
+    ],
+    "valid_labs": [
+      "Chest X-Ray",
+      "Chest CT Scan",
+      "CBC",
+      "Sputum Culture",
+      "CRP",
+      "Procalcitonin"
+    ]
+  },
+  "I10": {
+    "name": "Essential Hypertension",
+    "name_ar": "ارتفاع ضغط الدم الأساسي",
+    "valid_medications": [
+      "Lisinopril",
+      "Amlodipine",
+      "Propranolol",
+      "Metoprolol",
+      "Losartan",
+      "Valsartan",
+      "Hydrochlorothiazide",
+      "Atenolol",
+      "Carvedilol"
+    ],
+    "valid_labs": [
+      "ECG",
+      "Renal Function Test",
+      "Lipid Panel",
+      "Electrolytes",
+      "Urinalysis",
+      "Echocardiogram"
+    ]
+  },
+  "E11.9": {
+    "name": "Type 2 Diabetes Mellitus",
+    "name_ar": "داء السكري من النوع الثاني",
+    "valid_medications": [
+      "Metformin",
+      "Glipizide",
+      "Gliclazide",
+      "Sitagliptin",
+      "Empagliflozin",
+      "Insulin",
+      "Pioglitazone"
+    ],
+    "valid_labs": [
+      "HbA1c",
+      "Fasting Blood Glucose",
+      "Lipid Panel",
+      "Renal Function Test",
+      "Urinalysis",
+      "Eye Exam"
+    ]
+  },
+  "J45.909": {
+    "name": "Asthma, Unspecified",
+    "name_ar": "الربو غير المحدد",
+    "valid_medications": [
+      "Salbutamol",
+      "Albuterol",
+      "Budesonide",
+      "Fluticasone",
+      "Montelukast",
+      "Ipratropium",
+      "Theophylline"
+    ],
+    "valid_labs": [
+      "Spirometry",
+      "Peak Flow",
+      "Chest X-Ray",
+      "Allergy Testing",
+      "CBC"
+    ]
+  },
+  "K21.0": {
+    "name": "GERD with Esophagitis",
+    "name_ar": "الارتجاع المريئي مع التهاب المريء",
+    "valid_medications": [
+      "Omeprazole",
+      "Esomeprazole",
+      "Pantoprazole",
+      "Ranitidine",
+      "Famotidine",
+      "Antacids"
+    ],
+    "valid_labs": [
+      "Upper GI Endoscopy",
+      "pH Monitoring",
+      "Barium Swallow",
+      "H. Pylori Test"
+    ]
+  },
+  "M54.5": {
+    "name": "Low Back Pain",
+    "name_ar": "آلام أسفل الظهر",
+    "valid_medications": [
+      "Ibuprofen",
+      "Naproxen",
+      "Diclofenac",
+      "Paracetamol",
+      "Cyclobenzaprine",
+      "Methocarbamol"
+    ],
+    "valid_labs": [
+      "Lumbar X-Ray",
+      "Lumbar MRI",
+      "CT Spine",
+      "EMG"
+    ]
+  },
+  "N39.0": {
+    "name": "Urinary Tract Infection",
+    "name_ar": "التهاب المسالك البولية",
+    "valid_medications": [
+      "Ciprofloxacin",
+      "Nitrofurantoin",
+      "Trimethoprim",
+      "Amoxicillin",
+      "Cephalexin",
+      "Fosfomycin"
+    ],
+    "valid_labs": [
+      "Urinalysis",
+      "Urine Culture",
+      "CBC",
+      "Renal Function Test",
+      "Ultrasound Kidneys"
+    ]
+  }
+}
