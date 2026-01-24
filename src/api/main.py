@@ -53,16 +53,11 @@ app.add_middleware(
 )
 
 
-@app.get("/")
+@app.get("/health")
 async def root():
     """Root endpoint."""
     return {"name": "Medical Insurance Validation API", "version": "0.1.0"}
 
-
-@app.get("/health")
-async def health_check():
-    """Health check."""
-    return {"status": "healthy"}
 
 
 @app.post("/upload", response_model=UploadResponse)
@@ -71,11 +66,6 @@ async def upload_file(
     file_service: FileService = Depends(get_file_service),
     job_store: InMemoryJobStore = Depends(get_job_store),
 ):
-    """
-    Upload a prescription file.
-
-    Returns a job_id for tracking.
-    """
     file_service.validate_file(file)
     job_id = f"PAT-{uuid4().hex[:12]}"
     file_path, file_size = await file_service.save_file(file, job_id)
@@ -104,11 +94,6 @@ async def start_processing(
     processing_service: ProcessingService = Depends(get_processing_service),
     job_store: InMemoryJobStore = Depends(get_job_store),
 ):
-    """
-    Start processing a job.
-
-    Use GET /result/{job_id} to check status.
-    """
     job = job_store.get_job(request.job_id)
     if not job:
         raise HTTPException(status_code=404, detail=f"Job not found: {request.job_id}")
@@ -150,14 +135,7 @@ async def get_result(
     job_id: str,
     job_store: InMemoryJobStore = Depends(get_job_store),
 ):
-    """
-    Get job status and result.
-
-    Returns:
-        - If processing: returns "Processing..." message
-        - If completed: returns result
-        - If failed: returns error
-    """
+     
     job = job_store.get_job(job_id)
     if not job:
         raise HTTPException(status_code=404, detail=f"Job not found: {job_id}")
@@ -199,7 +177,7 @@ async def delete_job(
     job_store: InMemoryJobStore = Depends(get_job_store),
     processing_service: ProcessingService = Depends(get_processing_service),
 ):
-    """Delete a job."""
+    
     processing_service.cancel_processing(job_id)
     deleted = job_store.delete_job(job_id)
     if not deleted:
@@ -212,7 +190,7 @@ async def list_jobs(
     status: JobStatus | None = None,
     job_store: InMemoryJobStore = Depends(get_job_store),
 ):
-    """List all jobs."""
+    
     jobs = job_store.list_jobs(status=status)
     return {
         "total": len(jobs),
