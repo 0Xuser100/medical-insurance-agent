@@ -18,6 +18,7 @@ from src.core.protocols import ValidatorProtocol
 from src.services.extraction_service import ExtractionService
 from src.services.file_service import FileService
 from src.services.job_store import InMemoryJobStore
+from src.services.llm_aggregator_service import LLMAggregatorService
 from src.services.processing_service import ProcessingService
 from src.services.report_builder import ReportBuilder
 from src.services.validation_service import ValidationService
@@ -75,17 +76,30 @@ def get_report_builder() -> ReportBuilder:
 
 
 @lru_cache
+def get_llm_aggregator() -> LLMAggregatorService:
+    """
+    Get or create the LLM aggregator service.
+
+    Uses Gemini to synthesize OCR data and agent validation results
+    into the final structured JSON response.
+    """
+    return LLMAggregatorService()
+
+
+@lru_cache
 def get_validation_crew() -> ValidationCrew:
     """
     Get or create the multi-agent validation crew.
 
     SOLID: Dependency Inversion
-    - ValidationCrew depends on ReportBuilder for final output
+    - ValidationCrew depends on ReportBuilder for fallback output
+    - LLM Aggregator synthesizes final response using Gemini
     - Three specialized agents handle validation independently
-    - Pydantic validation happens only at report building stage
+    - Pydantic validation happens at aggregation/report building stage
     """
     return ValidationCrew(
         report_builder=get_report_builder(),
+        llm_aggregator=get_llm_aggregator(),
     )
 
 

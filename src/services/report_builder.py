@@ -213,19 +213,15 @@ class ReportBuilder:
         provider_id = data.get("provider_id") or data.get("doctor_information", {}).get("id", "Unknown")
         medications = data.get("medications", [])
 
-        # Ensure age is an integer
-        if isinstance(age, str):
-            try:
-                age = int(age.split()[0])  # Handle "45 years" format
-            except (ValueError, IndexError):
-                age = 0
+        # Convert age to string
+        age_str = str(age) if age else "0"
 
         # Build response - use job_id as patient_id
         return PrescriptionValidationResponse(
             patient_profile=PatientProfile(
                 id=job_id,  # Use job_id (PAT-xxx) as patient ID
                 name=patient_name,
-                age=age,
+                age=age_str,
                 gender=gender,
                 insurance_tier="Unknown",  # Not extracted from prescription
                 history_summary="",  # Not available in MVP
@@ -237,9 +233,9 @@ class ReportBuilder:
             ),
             ai_validation_engine=AIValidationEngine(
                 overall_status=overall_status,
-                confidence_score=success_rate,
+                confidence_score=str(success_rate),
                 summary_message=self._generate_summary_message(results_list, success_rate),
-                medication_count=len(medications),
+                medication_count=str(len(medications)),
                 line_items=line_items,
             ),
         )

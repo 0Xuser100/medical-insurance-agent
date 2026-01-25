@@ -7,11 +7,14 @@ Implements a specialized 3-agent system:
 - History Analyst: Refill interval verification
 
 Simple configuration pattern following CrewAI best practices.
+
+Agents return plain text descriptions which are then synthesized by
+the LLM aggregator layer (Gemini) into structured JSON output.
 """
 
 import json
 import os
-from typing import Any, List
+from typing import Any, List, TYPE_CHECKING
 
 from dotenv import load_dotenv
 from loguru import logger
@@ -29,15 +32,18 @@ from src.models.schemas import (
 )
 from src.services.report_builder import ReportBuilder
 
+if TYPE_CHECKING:
+    from src.services.llm_aggregator_service import LLMAggregatorService
+
 load_dotenv()
 
 # ============================================================================
-# Tools (one per agent)
+# Tools (one per agent) - Return plain text for LLM aggregation
 # ============================================================================
 
 # Global context storage (set before crew runs)
 _prescription_context: dict = {}
-_validation_results: List[ValidationResult] = []
+_agent_outputs: List[str] = []  # Collect plain text outputs
 
 
 @tool("clinical_match_check")
@@ -49,7 +55,7 @@ def clinical_match_check(medication_name: str) -> str:
     Args:
         medication_name: Name of the medication to validate
     """
-    global _prescription_context, _validation_results
+    global _prescription_context, _agent_outputs
 
     if not _prescription_context:
         return "Error: No prescription context available"
@@ -64,21 +70,16 @@ def clinical_match_check(medication_name: str) -> str:
         medication_name, icd_code, ItemType.MEDICATION
     )
 
-    # Store result
-    _validation_results.append(ValidationResult(
-        item_name=medication_name,
-        item_type=ItemType.MEDICATION,
-        status=ItemStatus.APPROVED if is_valid else ItemStatus.FLAGGED,
-        risk_level=RiskLevel.LOW if is_valid else RiskLevel.HIGH,
-        clinical_match=is_valid,
-        reason_en=reason_en,
-        reason_ar=reason_ar,
-        guardrail="clinical_match",
-    ))
-
+    # Build plain text result
     if is_valid:
-        return f"APPROVED: {medication_name} is appropriate for {diagnosis}"
-    return f"FLAGGED: {medication_name} - {reason_en}"
+        result = f"CLINICAL CHECK - {medication_name}: APPROVED. Medication is clinically appropriate for diagnosis {diagnosis} (ICD: {icd_code})."
+    else:
+        result = f"CLINICAL CHECK - {medication_name}: FLAGGED. {reason_en} Risk: HIGH."
+        if reason_ar:
+            result += f" (Arabic: {reason_ar})"
+
+    _agent_outputs.append(result)
+    return result
 
 
 @tool("medication_limit_check")
@@ -90,7 +91,7 @@ def medication_limit_check(medication_count: Any = None) -> str:
     Args:
         medication_count: Optional/Ignored. The tool calculates count internally.
     """
-    global _prescription_context, _validation_results
+    global _prescription_context, _agent_outputs
 
     if not _prescription_context:
         return "Error: No prescription context available"
@@ -99,22 +100,14 @@ def medication_limit_check(medication_count: Any = None) -> str:
     count = len(medications)
     limit = int(os.getenv("MEDICATION_LIMIT", "5"))
 
+    # Build plain text result
     if count <= limit:
-        return f"PASSED: {count} medications (limit: {limit})"
+        result = f"MEDICATION LIMIT CHECK: PASSED. Prescription contains {count} medications (limit: {limit}). No policy violation."
+    else:
+        result = f"MEDICATION LIMIT CHECK: PENDING_REVIEW. Prescription contains {count} medications which exceeds the policy limit of {limit}. Doctor review required. Risk: MEDIUM."
 
-    # Store result
-    _validation_results.append(ValidationResult(
-        item_name=f"Prescription ({count} medications)",
-        item_type=ItemType.MEDICATION,
-        status=ItemStatus.PENDING_REVIEW,
-        risk_level=RiskLevel.MEDIUM,
-        clinical_match=True,
-        reason_en=f"Exceeds limit of {limit}. Doctor review required.",
-        reason_ar=f"تتجاوز الحد المسموح ({limit}). مطلوب مراجعة الطبيب.",
-        guardrail="medication_limit",
-    ))
-
-    return f"VIOLATION: {count} medications exceeds limit of {limit}"
+    _agent_outputs.append(result)
+    return result
 
 
 @tool("medication_duration_check")
@@ -126,25 +119,18 @@ def medication_duration_check(medication_name: str) -> str:
     Args:
         medication_name: Name of the medication to check
     """
-    global _prescription_context, _validation_results
+    global _prescription_context, _agent_outputs
 
     if not _prescription_context:
         return "Error: No prescription context available"
 
     min_days = int(os.getenv("MIN_DURATION_DAYS", "14"))
 
-    # Store result (always passes without history)
-    _validation_results.append(ValidationResult(
-        item_name=medication_name,
-        item_type=ItemType.MEDICATION,
-        status=ItemStatus.APPROVED,
-        risk_level=RiskLevel.LOW,
-        clinical_match=True,
-        duration_check="Passed (No prior history)",
-        guardrail="medication_duration",
-    ))
+    # Build plain text result (no history available = passes)
+    result = f"DURATION CHECK - {medication_name}: PASSED. No prior dispensing history found. Minimum interval policy ({min_days} days) not violated."
 
-    return f"PASSED: {medication_name} - No prior history (min interval: {min_days} days)"
+    _agent_outputs.append(result)
+    return result
 
 
 def _extract_medications(context: dict) -> List[str]:
@@ -241,8 +227,10 @@ class ValidationCrew:
         report_builder: ReportBuilder,
         model_name: str | None = None,
         validation_service: Any = None,  # Backward compatibility
+        llm_aggregator: "LLMAggregatorService | None" = None,
     ):
         self.report_builder = report_builder
+        self.llm_aggregator = llm_aggregator
         self.model_name = model_name or os.getenv("OPENAI_MODEL_NAME", "gpt-4o-mini")
 
         # Create agents
@@ -251,7 +239,7 @@ class ValidationCrew:
         self.history_analyst = create_history_analyst(self.model_name)
 
     def _calculate_success_rate(self, results: List[ValidationResult]) -> float:
-        """Calculate approval rate."""
+        """Calculate approval rate (used for simple mode fallback)."""
         if not results:
             return 1.0
 
@@ -269,14 +257,14 @@ class ValidationCrew:
     async def validate_prescription(
         self, data: ExtractedOCRInput, job_id: str
     ) -> PrescriptionValidationResponse:
-        """Run multi-agent validation."""
-        global _prescription_context, _validation_results
+        """Run multi-agent validation with plain text output."""
+        global _prescription_context, _agent_outputs
 
         logger.info(f"ValidationCrew: Starting validation for {job_id}")
 
-        # Set global context
+        # Set global context and reset outputs
         _prescription_context = data
-        _validation_results = []
+        _agent_outputs = []
 
         # Full OCR context for agents
         context_json = json.dumps(data, indent=2, ensure_ascii=False)
@@ -351,13 +339,53 @@ POLICY: Minimum 14 days between same medication.
         except Exception as e:
             logger.warning(f"CrewAI warning: {e}")
 
-        # Build report
-        success_rate = self._calculate_success_rate(_validation_results)
-        logger.info(f"ValidationCrew: Success rate = {success_rate:.2%}")
+        # Combine all agent outputs into a single text block
+        agent_text_output = "\n".join(_agent_outputs)
+        logger.info(f"ValidationCrew: Collected {len(_agent_outputs)} agent outputs")
+        logger.debug(f"Agent outputs:\n{agent_text_output}")
 
-        return await self.report_builder.build_report(
-            data, _validation_results, success_rate, job_id
-        )
+        # Use LLM aggregator (required for this mode)
+        if self.llm_aggregator:
+            logger.info("ValidationCrew: Using LLM aggregator for final synthesis")
+            return await self.llm_aggregator.aggregate(
+                ocr_data=data,
+                agent_text=agent_text_output,
+                job_id=job_id,
+            )
+        else:
+            # Fallback: run simple validation if no aggregator
+            logger.warning("ValidationCrew: No aggregator available, falling back to simple mode")
+            return await self.validate_prescription_simple(data, job_id)
+
+    def _convert_results_to_text(self, results: List[ValidationResult]) -> str:
+        """Convert ValidationResult list to plain text for aggregator."""
+        lines = []
+        for r in results:
+            status = r.status.value
+            risk = r.risk_level.value
+
+            if r.guardrail == "clinical_match":
+                if r.status == ItemStatus.APPROVED:
+                    lines.append(f"CLINICAL CHECK - {r.item_name}: APPROVED. Medication is clinically appropriate.")
+                else:
+                    reason = r.reason_en or "Clinical mismatch detected"
+                    lines.append(f"CLINICAL CHECK - {r.item_name}: FLAGGED. {reason} Risk: {risk}.")
+
+            elif r.guardrail == "medication_limit":
+                if r.status == ItemStatus.APPROVED:
+                    lines.append(f"MEDICATION LIMIT CHECK: PASSED. Within policy limits.")
+                else:
+                    reason = r.reason_en or "Exceeds medication limit"
+                    lines.append(f"MEDICATION LIMIT CHECK: {status}. {reason} Risk: {risk}.")
+
+            elif r.guardrail == "medication_duration":
+                check_result = r.duration_check or "OK"
+                lines.append(f"DURATION CHECK - {r.item_name}: PASSED. {check_result}")
+
+            else:
+                lines.append(f"CHECK - {r.item_name}: {status}. {r.reason_en or 'No details'}")
+
+        return "\n".join(lines)
 
     async def validate_prescription_simple(
         self, data: ExtractedOCRInput, job_id: str
@@ -381,4 +409,16 @@ POLICY: Minimum 14 days between same medication.
             all_results.extend(results)
 
         success_rate = self._calculate_success_rate(all_results)
-        return await self.report_builder.build_report(data, all_results, success_rate, job_id)
+
+        # Use LLM aggregator if available, otherwise fall back to report builder
+        if self.llm_aggregator:
+            logger.info("ValidationCrew: Using LLM aggregator for final synthesis (simple mode)")
+            # Convert structured results to plain text for aggregator
+            agent_text = self._convert_results_to_text(all_results)
+            return await self.llm_aggregator.aggregate(
+                ocr_data=data,
+                agent_text=agent_text,
+                job_id=job_id,
+            )
+        else:
+            return await self.report_builder.build_report(data, all_results, success_rate, job_id)

@@ -11,13 +11,15 @@ Medical Insurance Automated Approval System - an AI-powered engine that processe
 The system follows a 5-stage pipeline:
 
 1. **Ingestion** - Upload prescription image/PDF
-2. **Extraction** - GCP Document AI (OCR) → Healthcare NLP API (entity extraction) *(to be added later)*
-3. **Context Retrieval** - Query patient history (post-MVP)
-4. **AI Validation Agent** - Runs three guardrails:
+2. **Extraction** - Gemini OCR extracts data from images/PDFs
+3. **AI Validation Agent** - CrewAI multi-agent system runs three guardrails:
    - Clinical Match Check (medications/labs must match diagnosis)
    - Medication Limit Check (>5 medications = doctor review)
    - Medication Duration Check (minimum 2 weeks between same medication)
-5. **Output** - Structured JSON for frontend consumption
+4. **LLM Aggregation** - Gemini synthesizes OCR data + agent results into structured response
+5. **Output** - Structured JSON with bilingual reasons (EN/AR) for frontend consumption
+
+See `LLM_AGGREGATOR_README.md` for detailed information about the aggregation layer.
 
 ## Agent Loop Structure
 
@@ -39,8 +41,8 @@ The system follows a 5-stage pipeline:
 - **Package Manager**: uv (not pip)
 - **Agent Framework**: CrewAI
 - **API**: FastAPI (async)
-- **LLM**: OpenAI (gpt-4o-mini)
-- **OCR/Extraction**: GCP Document AI + Healthcare NLP API *(to be added)*
+- **LLM (Agents)**: OpenAI (gpt-4o-mini)
+- **LLM (OCR/Aggregation)**: Gemini (gemini-3-flash-preview)
 - **Clinical Validation**: Rules Engine + JSON Lookup
 - **Schema Validation**: Pydantic
 - **Architecture**: SOLID Principles
@@ -61,6 +63,7 @@ The system follows a 5-stage pipeline:
 medical-insurance-agent/
 ├── pyproject.toml              # uv project config
 ├── .env.example                # Environment template
+├── LLM_AGGREGATOR_README.md    # LLM aggregator documentation
 ├── src/
 │   ├── core/
 │   │   └── protocols.py        # Abstract interfaces (SOLID - D, I)
@@ -72,10 +75,14 @@ medical-insurance-agent/
 │   │   ├── medication_limit.py # Guardrail 2 (SOLID - S)
 │   │   └── medication_duration.py # Guardrail 3 (SOLID - S)
 │   ├── services/
-│   │   ├── validation_service.py  # Orchestrates validators (SOLID - D)
-│   │   └── report_builder.py      # Builds JSON response (SOLID - S)
+│   │   ├── validation_service.py     # Orchestrates validators (SOLID - D)
+│   │   ├── report_builder.py         # Builds JSON response (SOLID - S)
+│   │   └── llm_aggregator_service.py # LLM-based response synthesis
 │   ├── agents/
 │   │   └── validation_crew.py  # CrewAI agent + crew
+│   ├── prompts/
+│   │   ├── __init__.py             # Package exports
+│   │   └── aggregator_prompt.py    # LLM aggregation prompt template
 │   ├── data/
 │   │   └── diagnosis_mappings.json  # ICD-10 → valid medications/labs
 │   └── api/
@@ -105,11 +112,12 @@ API_PORT=3000 uv run uvicorn src.api.main:app --reload
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/` | Root info |
-| GET | `/health` | Health check |
-| POST | `/validate` | Full validation with CrewAI agent |
-| POST | `/validate/simple` | Rule-based validation only (faster) |
-| GET | `/config` | Current configuration |
+| GET | `/health` | Health check / API info |
+| POST | `/upload` | Upload prescription image/PDF |
+| POST | `/process` | Start async processing (extraction + validation + aggregation) |
+| GET | `/result/{job_id}` | Poll for processing result |
+| DELETE | `/job/{job_id}` | Cancel/delete a job |
+| GET | `/jobs` | List all jobs (with optional status filter) |
 
 ## Key Domain Concepts
 
@@ -122,8 +130,13 @@ API_PORT=3000 uv run uvicorn src.api.main:app --reload
 ## Environment Variables
 
 ```bash
-OPENAI_API_KEY=sk-your-key        # Required for CrewAI
+# Required
+OPENAI_API_KEY=sk-your-key        # Required for CrewAI agents
+GEMINI_API_KEY=your-gemini-key    # Required for OCR + LLM aggregation
+
+# Optional
 OPENAI_MODEL_NAME=gpt-4o-mini     # Optional (default: gpt-4o-mini)
+GEMINI_MODEL_NAME=gemini-3-flash-preview  # Optional (default: gemini-3-flash-preview)
 MEDICATION_LIMIT=5                 # Optional (default: 5)
 MIN_DURATION_DAYS=14               # Optional (default: 14)
 API_HOST=0.0.0.0                   # Optional (default: 0.0.0.0)

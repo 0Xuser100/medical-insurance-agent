@@ -106,15 +106,15 @@ class ValidationResult(BaseModel):
 class ValidationDetails(BaseModel):
     """Validation details for a line item."""
 
-    clinical_match: bool = Field(..., description="Whether item matches diagnosis")
+    clinical_match: bool = Field(default=True, description="Whether item matches diagnosis")
     duration_check: Optional[str] = Field(
         default=None, description="Duration check result"
     )
     reason_en: Optional[str] = Field(
-        default=None, description="Reason in English"
+        default="", description="Reason in English"
     )
     reason_ar: Optional[str] = Field(
-        default=None, description="Reason in Arabic"
+        default="", description="Reason in Arabic"
     )
     linked_history_id: Optional[str] = Field(
         default=None, description="Linked previous claim ID for audit"
@@ -124,23 +124,23 @@ class ValidationDetails(BaseModel):
 class LineItem(BaseModel):
     """A single item in the prescription validation."""
 
-    type: ItemType = Field(..., description="Type of item")
-    item_name: str = Field(..., description="Name of the item")
-    status: ItemStatus = Field(..., description="Validation status")
-    ui_badge: str = Field(..., description="Badge text for frontend UI")
-    risk_level: RiskLevel = Field(..., description="Risk level")
+    type: ItemType = Field(default=ItemType.MEDICATION, description="Type of item")
+    item_name: str = Field(default="Unknown", description="Name of the item")
+    status: ItemStatus = Field(default=ItemStatus.PENDING_REVIEW, description="Validation status")
+    ui_badge: str = Field(default="⏳ Pending", description="Badge text for frontend UI")
+    risk_level: RiskLevel = Field(default=RiskLevel.LOW, description="Risk level")
     validation_details: ValidationDetails = Field(
-        ..., description="Detailed validation info"
+        default_factory=ValidationDetails, description="Detailed validation info"
     )
 
 
 class PatientProfile(BaseModel):
     """Patient profile information."""
 
-    id: str = Field(..., description="Patient ID")
-    name: str = Field(..., description="Patient name")
-    age: int = Field(..., description="Patient age")
-    gender: str = Field(..., description="Patient gender")
+    id: str = Field(default="PAT-00000", description="Patient ID")
+    name: str = Field(default="Unknown", description="Patient name")
+    age: str = Field(default="0", description="Patient age (string for LLM flexibility)")
+    gender: str = Field(default="Unknown", description="Patient gender")
     insurance_tier: str = Field(default="Unknown", description="Insurance tier")
     history_summary: str = Field(
         default="", description="Summary of patient medical history"
@@ -150,20 +150,20 @@ class PatientProfile(BaseModel):
 class ExtractedContext(BaseModel):
     """Context extracted from the prescription."""
 
-    primary_diagnosis: str = Field(..., description="Primary diagnosis")
-    icd_code: str = Field(..., description="ICD-10 code")
-    provider_id: str = Field(..., description="Provider ID")
+    primary_diagnosis: str = Field(default="Unknown", description="Primary diagnosis")
+    icd_code: str = Field(default="UNKNOWN", description="ICD-10 code")
+    provider_id: str = Field(default="Unknown", description="Provider ID")
 
 
 class AIValidationEngine(BaseModel):
     """AI validation engine results."""
 
-    overall_status: OverallStatus = Field(..., description="Overall validation status")
-    confidence_score: float = Field(
-        ..., ge=0.0, le=1.0, description="Confidence/success rate"
+    overall_status: OverallStatus = Field(default=OverallStatus.REVIEW_NEEDED, description="Overall validation status")
+    confidence_score: str = Field(
+        default="0.0", description="Confidence/success rate (string for LLM flexibility)"
     )
-    summary_message: str = Field(..., description="Summary message for UI")
-    medication_count: int = Field(default=0, description="Total medication count")
+    summary_message: str = Field(default="Validation completed.", description="Summary message for UI")
+    medication_count: str = Field(default="0", description="Total medication count (string for LLM flexibility)")
     line_items: list[LineItem] = Field(
         default_factory=list, description="Validated line items"
     )
@@ -183,35 +183,50 @@ class PrescriptionValidationResponse(BaseModel):
     timestamp: datetime = Field(
         default_factory=datetime.now, description="Timestamp of validation"
     )
-    patient_profile: PatientProfile = Field(..., description="Patient profile")
-    extracted_context: ExtractedContext = Field(..., description="Extracted context")
+    patient_profile: PatientProfile = Field(default_factory=PatientProfile, description="Patient profile")
+    extracted_context: ExtractedContext = Field(default_factory=ExtractedContext, description="Extracted context")
     ai_validation_engine: AIValidationEngine = Field(
-        ..., description="Validation results"
+        default_factory=AIValidationEngine, description="Validation results"
     )
 
     model_config = {"json_schema_extra": {
         "example": {
-            "transaction_id": "REQ-2024-8859",
-            "timestamp": "2024-05-21T10:30:00Z",
+            "transaction_id": "REQ-2026-5DD7",
+            "timestamp": "2026-01-25T10:18:58.813441",
             "patient_profile": {
-                "id": "PAT-10023",
-                "name": "Ahmed Hassan",
-                "age": 45,
+                "id": "PAT-edce340e42b8",
+                "name": "Omar Mohamed Hatem",
+                "age": "6",
                 "gender": "Male",
-                "insurance_tier": "Gold",
+                "insurance_tier": "Unknown",
                 "history_summary": "",
             },
             "extracted_context": {
-                "primary_diagnosis": "Acute Bronchitis",
-                "icd_code": "J20.9",
-                "provider_id": "DR-5501",
+                "primary_diagnosis": "Respiratory condition",
+                "icd_code": "J06.9",
+                "provider_id": "DR-WaelHatem",
             },
             "ai_validation_engine": {
-                "overall_status": "REVIEW_NEEDED",
-                "confidence_score": 0.75,
-                "summary_message": "Request partially approved.",
-                "medication_count": 3,
-                "line_items": [],
+                "overall_status": "APPROVED",
+                "confidence_score": "1.0",
+                "summary_message": "All items validated and approved for processing.",
+                "medication_count": "3",
+                "line_items": [
+                    {
+                        "type": "MEDICATION",
+                        "item_name": "Azulast phys N. spray",
+                        "status": "APPROVED",
+                        "ui_badge": "✓ Approved",
+                        "risk_level": "LOW",
+                        "validation_details": {
+                            "clinical_match": True,
+                            "duration_check": "OK",
+                            "reason_en": "Clinically appropriate for diagnosis",
+                            "reason_ar": "مناسب سريرياً للتشخيص",
+                            "linked_history_id": None,
+                        },
+                    },
+                ],
             },
         }
     }}
@@ -229,6 +244,7 @@ class JobStatus(str, Enum):
     PROCESSING = "PROCESSING"
     EXTRACTING = "EXTRACTING"
     VALIDATING = "VALIDATING"
+    AGGREGATING = "AGGREGATING"
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
 
@@ -284,39 +300,64 @@ class ResultResponse(BaseModel):
 
     model_config = {"json_schema_extra": {
         "example": {
-            "job_id": "PAT-1234567890AB",
+            "job_id": "PAT-edce340e42b8",
             "status": "COMPLETED",
-            "created_at": "2026-01-24T15:54:29.873Z",
-            "started_at": "2026-01-24T15:54:29.873Z",
-            "completed_at": "2026-01-24T15:54:29.873Z",
-            "signal": None,
+            "created_at": "2026-01-25T10:15:26.166367",
+            "started_at": "2026-01-25T10:15:50.474445",
+            "completed_at": "2026-01-25T10:18:58.813960",
+            "error": None,
             "extracted_data": {
+                "doctor_information": {
+                    "name": "Dr. Wael Hatem El Taei",
+                    "specialization": "Consultant Pediatrician and Neonatologist",
+                },
+                "patient_information": {
+                    "name": "Omar Mohamed Hatem",
+                    "age": "6.5 years",
+                    "weight": "20.4 kg",
+                },
                 "medications": [
-                    {"name": "Azulast phys N. spray", "dosage": "One puff...", "duration": "One month"}
-                ]
+                    {"name": "Azulast phys N. spray", "dosage": "One puff in each nostril twice daily", "duration": "One month"},
+                    {"name": "Lelipel syrup", "dosage": "5 ml in the evening", "duration": "One month"},
+                ],
             },
             "result": {
-                "transaction_id": "REQ-2024-8859",
-                "timestamp": "2024-05-21T10:30:00Z",
+                "transaction_id": "REQ-2026-5DD7",
+                "timestamp": "2026-01-25T10:18:58.813441",
                 "patient_profile": {
-                    "id": "PAT-10023",
-                    "name": "Ahmed Hassan",
-                    "age": 45,
+                    "id": "PAT-edce340e42b8",
+                    "name": "Omar Mohamed Hatem",
+                    "age": "6",
                     "gender": "Male",
-                    "insurance_tier": "Gold",
+                    "insurance_tier": "Unknown",
                     "history_summary": "",
                 },
                 "extracted_context": {
-                    "primary_diagnosis": "Acute Bronchitis",
-                    "icd_code": "J20.9",
-                    "provider_id": "DR-5501",
+                    "primary_diagnosis": "Respiratory condition",
+                    "icd_code": "J06.9",
+                    "provider_id": "DR-WaelHatem",
                 },
                 "ai_validation_engine": {
-                    "overall_status": "REVIEW_NEEDED",
-                    "confidence_score": 0.75,
-                    "summary_message": "Request partially approved.",
-                    "medication_count": 3,
-                    "line_items": [],
+                    "overall_status": "APPROVED",
+                    "confidence_score": "1.0",
+                    "summary_message": "All items validated and approved for processing.",
+                    "medication_count": "3",
+                    "line_items": [
+                        {
+                            "type": "MEDICATION",
+                            "item_name": "Azulast phys N. spray",
+                            "status": "APPROVED",
+                            "ui_badge": "✓ Approved",
+                            "risk_level": "LOW",
+                            "validation_details": {
+                                "clinical_match": True,
+                                "duration_check": "OK",
+                                "reason_en": "Clinically appropriate for diagnosis",
+                                "reason_ar": "مناسب سريرياً للتشخيص",
+                                "linked_history_id": None,
+                            },
+                        },
+                    ],
                 },
             }
         }

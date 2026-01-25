@@ -98,7 +98,7 @@ async def start_processing(
     if not job:
         raise HTTPException(status_code=404, detail=f"Job not found: {request.job_id}")
 
-    if job.status in (JobStatus.EXTRACTING, JobStatus.VALIDATING):
+    if job.status in (JobStatus.EXTRACTING, JobStatus.VALIDATING, JobStatus.AGGREGATING):
         return ProcessResponse(
             job_id=job.id,
             status=job.status,
@@ -146,6 +146,7 @@ async def get_result(
         JobStatus.PROCESSING,
         JobStatus.EXTRACTING,
         JobStatus.VALIDATING,
+        JobStatus.AGGREGATING,
     ):
         return ResultResponse(
             job_id=job.id,
