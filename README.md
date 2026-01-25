@@ -22,11 +22,23 @@ uv run uvicorn src.api.main:app --reload
 ### Option 2: Docker
 
 ```bash
-# Build image
-docker build -t medical-insurance-api .
+# 1. Configure environment
+cp .env.example .env  # Edit with your API keys
 
-# Run container
-docker run -p 8000:8000 --env-file .env medical-insurance-api
+# 2. Run (with logs)
+docker-compose up
+
+# 3. Run (in background)
+docker-compose up -d
+
+# 4. View logs (if running in background)
+docker-compose logs -f
+
+# 5. Stop
+docker-compose down
+
+# 6. Stop and remove volumes
+docker-compose down -v
 ```
 
 API available at: `http://localhost:8000/docs`
