@@ -268,17 +268,17 @@ class ResultResponse(BaseModel):
     job_id: str = Field(..., description="Job identifier")
     status: JobStatus = Field(..., description="Current job status")
     created_at: datetime = Field(..., description="Job creation timestamp")
-    started_at: datetime = Field(
+    started_at: Optional[datetime] = Field(
         default=None, description="Processing start timestamp"
     )
-    completed_at: datetime = Field(
+    completed_at: Optional[datetime] = Field(
         default=None, description="Processing completion timestamp"
     )
-    signal: Optional[str] = Field(default=None, description="Signal if failed")
+    error: Optional[str] = Field(default=None, description="Error message if failed or processing status")
     extracted_data: Optional[ExtractedOCRInput] = Field(
         default=None, description="Extracted OCR data from image/PDF"
     )
-    result: PrescriptionValidationResponse = Field(
+    result: Optional[PrescriptionValidationResponse] = Field(
         default=None, description="Validation result if completed"
     )
 
