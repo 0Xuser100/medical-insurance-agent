@@ -50,6 +50,84 @@ class LLMAggregatorService:
     - Does not validate or extract data
     """
 
+    # JSON Schema for Gemini structured output - guarantees valid response structure
+    RESPONSE_SCHEMA = {
+        "type": "object",
+        "properties": {
+            "transaction_id": {"type": "string"},
+            "timestamp": {"type": "string"},
+            "patient_profile": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string"},
+                    "name": {"type": "string"},
+                    "age": {"type": "number"},
+                    "gender": {"type": "string"},
+                    "insurance_tier": {"type": "string"},
+                    "history_summary": {"type": "string"},
+                },
+                "required": ["id", "name", "age", "gender", "insurance_tier", "history_summary"],
+            },
+            "extracted_context": {
+                "type": "object",
+                "properties": {
+                    "primary_diagnosis": {"type": "string"},
+                    "icd_code": {"type": "string"},
+                    "provider_id": {"type": "string"},
+                },
+                "required": ["primary_diagnosis", "icd_code", "provider_id"],
+            },
+            "ai_validation_engine": {
+                "type": "object",
+                "properties": {
+                    "overall_status": {
+                        "type": "string",
+                        "enum": ["APPROVED", "REVIEW_NEEDED", "REJECTED"],
+                    },
+                    "confidence_score": {"type": "number"},
+                    "summary_message": {"type": "string"},
+                    "medication_count": {"type": "integer"},
+                    "line_items": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "type": {
+                                    "type": "string",
+                                    "enum": ["MEDICATION", "LAB_ANALYSIS", "RADIOLOGY", "PROCEDURE"],
+                                },
+                                "item_name": {"type": "string"},
+                                "status": {
+                                    "type": "string",
+                                    "enum": ["APPROVED", "FLAGGED", "PENDING_REVIEW"],
+                                },
+                                "ui_badge": {"type": "string"},
+                                "risk_level": {
+                                    "type": "string",
+                                    "enum": ["LOW", "MEDIUM", "HIGH"],
+                                },
+                                "validation_details": {
+                                    "type": "object",
+                                    "properties": {
+                                        "clinical_match": {"type": "boolean"},
+                                        "duration_check": {"type": "string", "nullable": True},
+                                        "reason_en": {"type": "string"},
+                                        "reason_ar": {"type": "string"},
+                                        "linked_history_id": {"type": "string", "nullable": True},
+                                    },
+                                    "required": ["clinical_match", "reason_en", "reason_ar"],
+                                },
+                            },
+                            "required": ["type", "item_name", "status", "ui_badge", "risk_level", "validation_details"],
+                        },
+                    },
+                },
+                "required": ["overall_status", "confidence_score", "summary_message", "medication_count", "line_items"],
+            },
+        },
+        "required": ["transaction_id", "timestamp", "patient_profile", "extracted_context", "ai_validation_engine"],
+    }
+
     def __init__(self, model_name: str | None = None):
         """
         Initialize the LLM aggregator.
@@ -276,6 +354,8 @@ class LLMAggregatorService:
         """
         Call Gemini API with the aggregation prompt.
 
+        Uses JSON Schema enforcement to guarantee valid structured output.
+
         Args:
             prompt: Complete aggregation prompt
 
@@ -293,6 +373,7 @@ class LLMAggregatorService:
                     temperature=AGGREGATOR_CONFIG["temperature"],
                     max_output_tokens=AGGREGATOR_CONFIG["max_output_tokens"],
                     response_mime_type=AGGREGATOR_CONFIG["response_mime_type"],
+                    response_schema=self.RESPONSE_SCHEMA,  # Enforce JSON structure
                 ),
             )
             return response.text

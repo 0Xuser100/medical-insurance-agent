@@ -36,6 +36,63 @@ Return ONLY a valid JSON object containing the extracted information.
 No markdown, no triple backticks, no explanations.
 """
 
+# JSON Schema to enforce response structure - prevents Gemini from returning arrays
+EXTRACTION_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "patient": {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string"},
+                "age": {"type": "string"},
+                "gender": {"type": "string"},
+                "id": {"type": "string"},
+            },
+        },
+        "provider": {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string"},
+                "id": {"type": "string"},
+                "facility": {"type": "string"},
+            },
+        },
+        "diagnosis": {
+            "type": "object",
+            "properties": {
+                "primary": {"type": "string"},
+                "icd_code": {"type": "string"},
+            },
+        },
+        "medications": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "dosage": {"type": "string"},
+                    "frequency": {"type": "string"},
+                    "duration": {"type": "string"},
+                    "quantity": {"type": "string"},
+                },
+            },
+        },
+        "labs": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "type": {"type": "string"},
+                },
+            },
+        },
+        "date": {"type": "string"},
+        "notes": {"type": "string"},
+    },
+    "required": ["medications"],
+}
+
 
 # MIME type mapping for file extensions
 MIME_TYPES = {
@@ -121,6 +178,7 @@ class ExtractionService:
             config=types.GenerateContentConfig(
                 temperature=0,
                 response_mime_type="application/json",
+                response_schema=EXTRACTION_SCHEMA,  # Enforce object structure
             ),
         )
         logger.info("Received response from Gemini")
@@ -152,6 +210,11 @@ class ExtractionService:
                     f"Failed to parse Gemini response as JSON: {e}\n"
                     f"Raw response (first 500 chars): {json_text[:500]}"
                 ) from e
+
+        # Handle case where Gemini returns a list instead of object
+        if isinstance(data, list):
+            logger.warning("Gemini returned array instead of object, wrapping in medications key")
+            data = {"medications": data}
 
         # 6. Save to disk if path provided
         if save_path:
