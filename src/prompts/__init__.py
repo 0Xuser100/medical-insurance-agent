@@ -1,13 +1,7 @@
 """Prompts package for LLM prompt engineering."""
 
-from src.prompts.aggregator_prompt import (
-    AGGREGATOR_CONFIG,
-    SYSTEM_PROMPT,
-    build_aggregation_prompt,
-)
+from src.prompts.aggregator_prompt import UNIFIED_VALIDATION_PROMPT
 
 __all__ = [
-    "SYSTEM_PROMPT",
-    "build_aggregation_prompt",
-    "AGGREGATOR_CONFIG",
+    "UNIFIED_VALIDATION_PROMPT",
 ]
