@@ -49,7 +49,6 @@ Count total medications in the prescription:
 2. If count <= {medication_limit}: No special action needed
 3. If count > {medication_limit}:
    - Set overall_status to REVIEW_NEEDED
-   - Add note in summary_message about polypharmacy review required
    - This does NOT change individual medication status, only overall_status
 
 ### Rule 3: Duration Check (Refill Interval)
@@ -90,25 +89,11 @@ For FLAGGED items (clinical mismatch):
 - EN: "Medication not indicated for [diagnosis_name] - requires clinical review"
 - AR: "الدواء غير مناسب لتشخيص [diagnosis_name_ar] - يتطلب مراجعة طبية"
 
-For PENDING_REVIEW (medication limit exceeded - use in summary only):
-- EN: "Prescription exceeds medication limit - polypharmacy review required"
-- AR: "الوصفة تتجاوز الحد الأقصى للأدوية - يتطلب مراجعة تعدد الأدوية"
-
 **duration_check:**
 - Always set to "OK" (no history available in MVP)
 
 **patient_name, patient_age, patient_gender:**
 - Extract from OCR data (look in patient_information, patient, or similar fields)
-- Use "Unknown" if not found
-
-**primary_diagnosis, icd_code:**
-- Extract from OCR data (look in diagnosis, diagnosis_information, or similar fields)
-- Use diagnosis name from Clinical Reference if ICD code is found there
-- Use "UNKNOWN" for icd_code if not found
-
-**provider_id:**
-- Extract from OCR data (look in doctor_information, provider, or similar fields)
-- Format as "DR-[name]" if raw name found
 - Use "Unknown" if not found
 
 ---

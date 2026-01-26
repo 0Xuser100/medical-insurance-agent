@@ -21,7 +21,6 @@ from src.models.schemas import (
     PrescriptionValidationResponse,
     AIValidationEngine,
     PatientProfile,
-    ExtractedContext,
     LineItem,
     ValidationDetails,
     ItemType,
@@ -54,12 +53,8 @@ class ValidationOutputSchema(BaseModel):
     patient_name: str = Field(description="Patient name from prescription")
     patient_age: str = Field(description="Patient age")
     patient_gender: str = Field(description="Patient gender")
-    primary_diagnosis: str = Field(description="Primary diagnosis")
-    icd_code: str = Field(description="ICD-10 code")
-    provider_id: str = Field(description="Provider/doctor ID")
     overall_status: str = Field(description="Overall status: APPROVED, REVIEW_NEEDED, or REJECTED")
     confidence_score: float = Field(description="Confidence score 0.0 to 1.0")
-    summary_message: str = Field(description="Summary message for UI")
     line_items: list[ValidationLineItem] = Field(description="Validated line items")
 
 
@@ -197,20 +192,12 @@ class LangChainValidationService:
                 name=result.patient_name,
                 age=result.patient_age,
                 gender=result.patient_gender,
-                insurance_tier="Unknown",
-                history_summary="",
-            ),
-            extracted_context=ExtractedContext(
-                primary_diagnosis=result.primary_diagnosis,
-                icd_code=result.icd_code,
-                provider_id=result.provider_id,
             ),
             ai_validation_engine=AIValidationEngine(
                 overall_status=self._safe_enum_parse(
                     OverallStatus, result.overall_status, OverallStatus.REVIEW_NEEDED
                 ),
                 confidence_score=str(result.confidence_score),
-                summary_message=result.summary_message,
                 medication_count=str(len(medications)),
                 line_items=line_items,
             ),

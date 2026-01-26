@@ -92,9 +92,6 @@ class ValidationResult(BaseModel):
     reason_ar: Optional[str] = Field(
         default=None, description="Reason in Arabic"
     )
-    linked_history_id: Optional[str] = Field(
-        default=None, description="Linked history claim ID"
-    )
     guardrail: str = Field(..., description="Which guardrail produced this result")
 
 
@@ -115,9 +112,6 @@ class ValidationDetails(BaseModel):
     )
     reason_ar: Optional[str] = Field(
         default="", description="Reason in Arabic"
-    )
-    linked_history_id: Optional[str] = Field(
-        default=None, description="Linked previous claim ID for audit"
     )
 
 
@@ -141,18 +135,6 @@ class PatientProfile(BaseModel):
     name: str = Field(default="Unknown", description="Patient name")
     age: str = Field(default="0", description="Patient age (string for LLM flexibility)")
     gender: str = Field(default="Unknown", description="Patient gender")
-    insurance_tier: str = Field(default="Unknown", description="Insurance tier")
-    history_summary: str = Field(
-        default="", description="Summary of patient medical history"
-    )
-
-
-class ExtractedContext(BaseModel):
-    """Context extracted from the prescription."""
-
-    primary_diagnosis: str = Field(default="Unknown", description="Primary diagnosis")
-    icd_code: str = Field(default="UNKNOWN", description="ICD-10 code")
-    provider_id: str = Field(default="Unknown", description="Provider ID")
 
 
 class AIValidationEngine(BaseModel):
@@ -162,7 +144,6 @@ class AIValidationEngine(BaseModel):
     confidence_score: str = Field(
         default="0.0", description="Confidence/success rate (string for LLM flexibility)"
     )
-    summary_message: str = Field(default="Validation completed.", description="Summary message for UI")
     medication_count: str = Field(default="0", description="Total medication count (string for LLM flexibility)")
     line_items: list[LineItem] = Field(
         default_factory=list, description="Validated line items"
@@ -184,7 +165,6 @@ class PrescriptionValidationResponse(BaseModel):
         default_factory=datetime.now, description="Timestamp of validation"
     )
     patient_profile: PatientProfile = Field(default_factory=PatientProfile, description="Patient profile")
-    extracted_context: ExtractedContext = Field(default_factory=ExtractedContext, description="Extracted context")
     ai_validation_engine: AIValidationEngine = Field(
         default_factory=AIValidationEngine, description="Validation results"
     )
@@ -198,18 +178,10 @@ class PrescriptionValidationResponse(BaseModel):
                 "name": "Omar Mohamed Hatem",
                 "age": "6",
                 "gender": "Male",
-                "insurance_tier": "Unknown",
-                "history_summary": "",
-            },
-            "extracted_context": {
-                "primary_diagnosis": "Respiratory condition",
-                "icd_code": "J06.9",
-                "provider_id": "DR-WaelHatem",
             },
             "ai_validation_engine": {
                 "overall_status": "APPROVED",
                 "confidence_score": "1.0",
-                "summary_message": "All items validated and approved for processing.",
                 "medication_count": "3",
                 "line_items": [
                     {
@@ -223,7 +195,6 @@ class PrescriptionValidationResponse(BaseModel):
                             "duration_check": "OK",
                             "reason_en": "Clinically appropriate for diagnosis",
                             "reason_ar": "مناسب سريرياً للتشخيص",
-                            "linked_history_id": None,
                         },
                     },
                 ],
@@ -329,18 +300,10 @@ class ResultResponse(BaseModel):
                     "name": "Omar Mohamed Hatem",
                     "age": "6",
                     "gender": "Male",
-                    "insurance_tier": "Unknown",
-                    "history_summary": "",
-                },
-                "extracted_context": {
-                    "primary_diagnosis": "Respiratory condition",
-                    "icd_code": "J06.9",
-                    "provider_id": "DR-WaelHatem",
                 },
                 "ai_validation_engine": {
                     "overall_status": "APPROVED",
                     "confidence_score": "1.0",
-                    "summary_message": "All items validated and approved for processing.",
                     "medication_count": "3",
                     "line_items": [
                         {
@@ -354,7 +317,6 @@ class ResultResponse(BaseModel):
                                 "duration_check": "OK",
                                 "reason_en": "Clinically appropriate for diagnosis",
                                 "reason_ar": "مناسب سريرياً للتشخيص",
-                                "linked_history_id": None,
                             },
                         },
                     ],
