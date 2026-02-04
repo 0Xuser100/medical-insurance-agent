@@ -1,6 +1,6 @@
 # Medical Insurance Validation API
 
-AI-powered prescription validation system that processes prescription images and generates approval/rejection reports with Human-in-the-Loop review.
+AI-powered prescription validation system that processes prescription images/PDFs and generates structured approval/rejection reports with bilingual reasons (EN/AR) and Human-in-the-Loop review.
 
 ---
 
@@ -25,41 +25,44 @@ uv run uvicorn src.api.main:app --reload
 # 1. Configure environment
 cp .env.example .env  # Edit with your API keys
 
-# 2. Run (with logs)
-docker-compose up
+# 2. Build and run
+docker compose up --build
 
-# 3. Run (in background)
-docker-compose up -d
+# 3. Stop
+docker compose down
+```
 
-# 4. View logs (if running in background)
-docker-compose logs -f
+**After changing source code**, rebuild and restart:
 
-# 5. Stop
-docker-compose down
-
-# 6. Stop and remove volumes
-docker-compose down -v
+```bash
+docker compose up --build
 ```
 
 API available at: `http://localhost:8000/docs`
 
----
+
 
 ## Architecture
 
+The system uses a **LangChain + Gemini** pipeline that replaces the previous CrewAI multi-agent approach with a single unified LLM call using Gemini's native structured output.
+
 ```
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│   UPLOAD    │────▶│   EXTRACT   │────▶│  VALIDATE   │────▶│   RESULT    │
-│  Image/PDF  │     │ Gemini OCR  │     │  3 Rules    │     │    JSON     │
-└─────────────┘     └─────────────┘     └─────────────┘     └─────────────┘
+┌─────────────┐     ┌─────────────┐     ┌──────────────────┐     ┌─────────────┐
+│   UPLOAD    │────▶│   EXTRACT   │────▶│    VALIDATE      │────▶│   RESULT    │
+│  Image/PDF  │     │ Gemini OCR  │     │ LangChain+Gemini │     │    JSON     │
+│             │     │ (GenAI SDK) │     │ Structured Output│     │ (Bilingual) │
+└─────────────┘     └─────────────┘     └──────────────────┘     └─────────────┘
 ```
 
-### Workflow
+### Processing Pipeline
 
-1. **Upload**: Client sends prescription image/PDF
-2. **Extract**: Gemini Vision OCR extracts patient, diagnosis, medications
-3. **Validate**: Three guardrails verify clinical correctness
-4. **Result**: Structured JSON with line-item approvals/rejections
+1. **Upload** - Client sends a prescription image (JPEG, PNG, GIF, WebP, TIFF) or PDF (max 10MB)
+2. **Extract** - Gemini Vision OCR extracts patient info, diagnosis, medications, labs, and provider details using structured JSON schema enforcement
+3. **Validate** - LangChain invokes Gemini with native structured output to apply all 3 validation rules in a single call:
+   - Clinical Match Check (ICD-10 medication-diagnosis matching)
+   - Medication Limit Check (>5 medications triggers review)
+   - Duration Check (refill interval validation, placeholder for MVP)
+4. **Result** - Structured JSON with line-item approvals/rejections, bilingual reasons (EN/AR), and UI badges
 
 ---
 
@@ -67,45 +70,50 @@ API available at: `http://localhost:8000/docs`
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/upload` | Upload prescription file |
-| POST | `/process` | Start OCR + validation |
-| GET | `/result/{job_id}` | Get result (poll until COMPLETED) |
-| GET | `/jobs` | List all jobs |
-| DELETE | `/job/{job_id}` | Delete job |
+| GET | `/health` | Health check / API info |
+| POST | `/upload` | Upload prescription image/PDF |
+| POST | `/process` | Start async OCR + validation |
+| GET | `/result/{job_id}` | Poll for processing result |
+| DELETE | `/job/{job_id}` | Cancel/delete a job |
+| GET | `/jobs` | List all jobs (with optional `?status=` filter) |
 
 ### Example Flow
 
 ```bash
 # 1. Upload
 curl -X POST http://localhost:8000/upload -F "file=@prescription.jpg"
-# Returns: {"job_id": "PAT-abc123..."}
+# Returns: {"job_id": "PAT-abc123...", "status": "UPLOADED", ...}
 
 # 2. Process
 curl -X POST http://localhost:8000/process \
   -H "Content-Type: application/json" \
   -d '{"job_id": "PAT-abc123..."}'
+# Returns: {"job_id": "PAT-abc123...", "status": "PROCESSING", ...}
 
 # 3. Poll result
 curl http://localhost:8000/result/PAT-abc123...
+# Returns full result when status is COMPLETED
 ```
 
 ---
 
-## Validation Guardrails
+## Validation Rules
+
+All three rules are executed in a **single LLM call** via LangChain with Gemini's native structured output (schema enforced at token generation level).
 
 ### 1. Clinical Match Check
-Validates medications match the diagnosis using ICD-10 mappings.
+Validates each medication against the diagnosis using ICD-10 mappings with fuzzy matching (ignores dosage/form suffixes).
 ```
 Diagnosis: Acute Bronchitis (J20.9)
-├── Azithromycin ──► APPROVED (valid for J20.9)
-└── Propranolol  ──► FLAGGED (not indicated)
+├── Azithromycin 500mg ──► APPROVED (matches "Azithromycin" in J20.9 valid list)
+└── Propranolol 40mg   ──► FLAGGED  (not in J20.9 valid medications)
 ```
 
 ### 2. Medication Limit Check
-Flags prescriptions with >5 medications for review.
+Flags the overall prescription for review when medication count exceeds the configured limit (default: 5). Individual medication statuses are not affected.
 
-### 3. Medication Duration Check
-Ensures 14-day minimum between same medication refills.
+### 3. Duration Check
+Validates refill intervals (minimum 14 days between same medication). Currently returns "OK" for all items in MVP (placeholder for patient history integration).
 
 ---
 
@@ -114,29 +122,39 @@ Ensures 14-day minimum between same medication refills.
 ```
 medical-insurance-agent/
 ├── src/
+│   ├── __init__.py
 │   ├── api/
-│   │   ├── main.py              # FastAPI endpoints
-│   │   └── dependencies.py      # Dependency injection
+│   │   ├── __init__.py
+│   │   ├── main.py                         # FastAPI app with 6 endpoints
+│   │   └── dependencies.py                 # Dependency injection (SOLID - D)
+│   ├── core/
+│   │   ├── __init__.py
+│   │   └── protocols.py                    # ValidationServiceProtocol interface
 │   ├── models/
-│   │   └── schemas.py           # Pydantic models
+│   │   ├── __init__.py
+│   │   └── schemas.py                      # Pydantic models (enums, request/response)
 │   ├── services/
-│   │   ├── extraction_service.py    # Gemini OCR
-│   │   ├── processing_service.py    # Background jobs
-│   │   ├── report_builder.py        # Builds JSON response
-│   │   ├── job_store.py             # In-memory job storage
-│   │   └── file_service.py          # File upload handling
-│   ├── validators/
-│   │   ├── clinical_match.py        # Guardrail 1
-│   │   ├── medication_limit.py      # Guardrail 2
-│   │   └── medication_duration.py   # Guardrail 3
-│   ├── agents/
-│   │   └── validation_crew.py       # CrewAI multi-agent
+│   │   ├── __init__.py
+│   │   ├── extraction_service.py           # Gemini OCR extraction (Google GenAI SDK)
+│   │   ├── langchain_validation_service.py # Unified validation (LangChain + Gemini)
+│   │   ├── processing_service.py           # Background job orchestration
+│   │   ├── job_store.py                    # In-memory job storage (async-safe)
+│   │   └── file_service.py                 # File upload validation & storage
+│   ├── prompts/
+│   │   ├── __init__.py                     # Exports UNIFIED_VALIDATION_PROMPT
+│   │   └── aggregator_prompt.py            # Unified validation prompt template
 │   └── data/
-│       └── diagnosis_mappings.json  # ICD-10 mappings
-├── uploads/                         # Uploaded files
-├── Dockerfile
-├── .env
-└── pyproject.toml
+│       └── diagnosis_mappings.json         # ICD-10 → valid medications/labs
+├── tests/
+│   ├── __init__.py
+│   ├── test_api_schema.py                  # API endpoint schema tests
+│   └── test_validators.py                  # Validator tests
+├── uploads/                                # Uploaded files (runtime)
+├── Dockerfile                              # Multi-stage build (uv + Python 3.12)
+├── docker-compose.yml                      # Container orchestration
+├── pyproject.toml                          # uv project config
+├── .env.example                            # Environment template
+└── LLM_AGGREGATOR_README.md                # LLM aggregation layer docs
 ```
 
 ---
@@ -146,23 +164,20 @@ medical-insurance-agent/
 Create a `.env` file:
 
 ```env
-# OpenAI (for CrewAI agent)
+# Gemini API (for OCR extraction + LangChain validation)
+GEMINI_API_KEY="your-gemini-api-key"
+GEMINI_MODEL_NAME="gemini-3-flash-preview"
+
+# OpenAI (optional, for CrewAI if enabled)
 OPENAI_API_KEY="sk-..."
-OPENAI_MODEL_NAME="gpt-4o-mini"
+OPENAI_MODEL_NAME="gpt-5-mini"
 
-# Google Cloud (for Gemini OCR)
-GOOGLE_CLOUD_PROJECT="your-project-id"
-GOOGLE_CLOUD_LOCATION="us-central1"
-GEMINI_MODEL_NAME="gemini-2.5-flash-preview-04-17"
-GOOGLE_APPLICATION_CREDENTIALS="your-service-account.json"
-
-# Validation rules
-MEDICATION_LIMIT=5
-MIN_DURATION_DAYS=14
-
-# API
+# API server
 API_HOST=0.0.0.0
 API_PORT=8000
+
+# Optional
+CREWAI_TRACING_ENABLED=true
 ```
 
 ---
@@ -171,8 +186,8 @@ API_PORT=8000
 
 ```
 UPLOADED ──► EXTRACTING ──► VALIDATING ──► COMPLETED
-                │                              │
-                └──────────► FAILED ◄──────────┘
+                 │                │
+                 └────► FAILED ◄──┘
 ```
 
 ---
@@ -181,23 +196,45 @@ UPLOADED ──► EXTRACTING ──► VALIDATING ──► COMPLETED
 
 ```json
 {
-  "job_id": "PAT-abc123...",
+  "job_id": "PAT-edce340e42b8",
   "status": "COMPLETED",
+  "created_at": "2026-01-25T10:15:26.166367",
+  "started_at": "2026-01-25T10:15:50.474445",
+  "completed_at": "2026-01-25T10:18:58.813960",
+  "error": null,
+  "extracted_data": {
+    "patient": { "name": "Omar Mohamed Hatem", "age": "6.5 years", "gender": "Male" },
+    "diagnosis": { "primary": "Allergic Rhinitis", "icd_code": "J30.9" },
+    "medications": [
+      { "name": "Azulast phys N. spray", "dosage": "One puff twice daily", "duration": "One month" }
+    ]
+  },
   "result": {
-    "transaction_id": "REQ-2024-A1B2",
+    "transaction_id": "REQ-2026-5DD7",
+    "timestamp": "2026-01-25T10:18:58.813441",
     "patient_profile": {
-      "id": "PAT-10023",
-      "name": "Ahmed Hassan",
-      "age": 45
+      "id": "PAT-edce340e42b8",
+      "name": "Omar Mohamed Hatem",
+      "age": "6",
+      "gender": "Male"
     },
     "ai_validation_engine": {
-      "overall_status": "REVIEW_NEEDED",
-      "confidence_score": 0.75,
+      "overall_status": "APPROVED",
+      "confidence_score": "1.0",
+      "medication_count": "3",
       "line_items": [
         {
-          "item_name": "Azithromycin 500mg",
+          "type": "MEDICATION",
+          "item_name": "Azulast phys N. spray",
           "status": "APPROVED",
-          "risk_level": "LOW"
+          "ui_badge": "✓ Approved",
+          "risk_level": "LOW",
+          "validation_details": {
+            "clinical_match": true,
+            "duration_check": "OK",
+            "reason_en": "Clinically appropriate for diagnosis",
+            "reason_ar": "مناسب سريرياً للتشخيص"
+          }
         }
       ]
     }
@@ -238,8 +275,25 @@ while (true) {
 
 | Component | Technology |
 |-----------|------------|
-| API | FastAPI |
-| OCR | Google Gemini Vision |
-| Validation Agent | CrewAI + OpenAI |
-| Schema | Pydantic |
+| API | FastAPI (async) |
+| OCR Extraction | Google Gemini Vision (GenAI SDK) |
+| Validation | LangChain + Gemini Structured Output |
+| Schema | Pydantic v2 |
+| Logging | Loguru |
 | Package Manager | uv |
+| Container | Docker (multi-stage, non-root) |
+| Python | 3.12+ |
+
+---
+
+## Key Dependencies
+
+| Package | Purpose |
+|---------|---------|
+| `fastapi` | Async web framework |
+| `google-genai` | Gemini API client (OCR extraction) |
+| `langchain` + `langchain-google-genai` | LLM orchestration with structured output |
+| `pydantic` | Data validation and schema enforcement |
+| `loguru` | Structured logging |
+| `aiofiles` | Async file I/O |
+| `uvicorn` | ASGI server |

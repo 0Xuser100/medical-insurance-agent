@@ -31,10 +31,90 @@ def _repair_json(text: str) -> str:
 
 
 EXTRACTION_PROMPT = """
-Analyze the provided medical prescription image and extract all visible data.
-Return ONLY a valid JSON object containing the extracted information.
-No markdown, no triple backticks, no explanations.
+You are a medical document data extractor. Extract ONLY information that is explicitly visible in the provided prescription image.
+
+**IMPORTANT: ALL OUTPUT MUST BE IN ENGLISH**
+- Even if the prescription is in Arabic, translate ALL extracted data to English
+- Patient names: Transliterate Arabic names to English (e.g., "عمر محمد حاتم" -> "Omar Mohamed Hatem")
+- Medication names: Use English/international names
+- Diagnosis: Translate to English
+- All text fields must be in English
+
+CRITICAL RULES:
+1. Extract ONLY what is written in the document - DO NOT infer, guess, or add any information
+2. DO NOT derive diagnosis from medications - if diagnosis is not explicitly written, use "not found"
+3. DO NOT add ICD codes unless they are explicitly written in the document
+4. If any field is not found in the document, use the exact string "not found" for that field
+5. For medications array, use empty array [] if none are found
+6. GENDER: If gender is not explicitly written, PREDICT it from the patient's name (e.g., "Omar" -> "Male", "Fatima" -> "Female")
+7. LABS: If no labs are found in the document, return labs as a single-item array: [{"name": "not found", "type": "not found"}]
+
+Required fields to extract:
+- patient: name, age, gender (predict from name if not written), id (use "not found" for any missing field)
+- provider: name, id, facility (use "not found" for any missing field)
+- diagnosis: primary, icd_code (use "not found" if not explicitly written - NEVER infer from medications)
+- medications: array of {name, dosage, frequency, duration, quantity} - only include medications explicitly listed
+- labs: array of {name, type} - if no labs found, use [{"name": "not found", "type": "not found"}]
+- date: prescription date (use "not found" if not visible)
+
+Return ONLY a valid JSON object. No markdown, no triple backticks, no explanations.
 """
+
+# JSON Schema to enforce response structure - prevents Gemini from returning arrays
+EXTRACTION_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "patient": {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string"},
+                "age": {"type": "string"},
+                "gender": {"type": "string"},
+                "id": {"type": "string"},
+            },
+        },
+        "provider": {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string"},
+                "id": {"type": "string"},
+                "facility": {"type": "string"},
+            },
+        },
+        "diagnosis": {
+            "type": "object",
+            "properties": {
+                "primary": {"type": "string"},
+                "icd_code": {"type": "string"},
+            },
+        },
+        "medications": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "dosage": {"type": "string"},
+                    "frequency": {"type": "string"},
+                    "duration": {"type": "string"},
+                    "quantity": {"type": "string"},
+                },
+            },
+        },
+        "labs": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "type": {"type": "string"},
+                },
+            },
+        },
+        "date": {"type": "string"},
+    },
+    "required": ["medications"],
+}
 
 
 # MIME type mapping for file extensions
@@ -121,6 +201,7 @@ class ExtractionService:
             config=types.GenerateContentConfig(
                 temperature=0,
                 response_mime_type="application/json",
+                response_schema=EXTRACTION_SCHEMA,  # Enforce object structure
             ),
         )
         logger.info("Received response from Gemini")
@@ -152,6 +233,11 @@ class ExtractionService:
                     f"Failed to parse Gemini response as JSON: {e}\n"
                     f"Raw response (first 500 chars): {json_text[:500]}"
                 ) from e
+
+        # Handle case where Gemini returns a list instead of object
+        if isinstance(data, list):
+            logger.warning("Gemini returned array instead of object, wrapping in medications key")
+            data = {"medications": data}
 
         # 6. Save to disk if path provided
         if save_path:

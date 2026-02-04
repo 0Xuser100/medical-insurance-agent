@@ -1,36 +1,39 @@
-# Multi-stage build for Medical Insurance Validation API
-FROM python:3.12-slim AS builder
-
-# Install uv
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
+FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim AS builder
 
 WORKDIR /app
 
-# Copy dependency files
+# Install dependencies first (cached layer)
 COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-dev --no-install-project
 
-# Install dependencies
+# Copy source code
+COPY src/ src/
+
+
+
+# Install the project itself
 RUN uv sync --frozen --no-dev
 
-# Production image
-FROM python:3.12-slim
+
+FROM python:3.12-slim-bookworm AS runtime
 
 WORKDIR /app
 
-# Copy virtual environment from builder
+# Create non-root user
+RUN groupadd --system app && useradd --system --gid app app
+
+# Copy the virtual environment and source from builder
 COPY --from=builder /app/.venv /app/.venv
-
-# Copy application code
-COPY src/ ./src/
-COPY uploads/ ./uploads/
-
-# Use the virtual environment
-ENV PATH="/app/.venv/bin:$PATH"
+COPY --from=builder /app/src /app/src
+COPY --from=builder /app/pyproject.toml /app/pyproject.toml
 
 # Create uploads directory
-RUN mkdir -p /app/uploads
+RUN mkdir -p /app/uploads && chown -R app:app /app
+
+ENV PATH="/app/.venv/bin:$PATH"
+
+USER app
 
 EXPOSE 8000
 
-# Run the application
 CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]

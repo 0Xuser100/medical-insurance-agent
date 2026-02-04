@@ -1,0 +1,36 @@
+{
+  "_description": "Dummy data for patient medication history - used for Rule 3 Duration Check",
+  "_note": "Search by patient name (case-insensitive, fuzzy match). Each patient has name_variants for flexible matching.",
+  "patients": [
+    {
+      "name": "Ahmed Hassan",
+      "name_variants": ["ahmed hassan", "ahmed", "احمد حسن"],
+      "dispensed_medications": ["Metformin", "Lisinopril", "Aspirin"]
+    },
+    {
+      "name": "Fatima Ali",
+      "name_variants": ["fatima ali", "fatima", "فاطمة علي"],
+      "dispensed_medications": ["Omeprazole", "Paracetamol"]
+    },
+    {
+      "name": "Mohamed Salem",
+      "name_variants": ["mohamed salem", "محمد سالم"],
+      "dispensed_medications": ["Amoxicillin", "Ibuprofen", "Azithromycin"]
+    },
+    {
+      "name": "Sara Ahmed",
+      "name_variants": ["sara ahmed", "سارة احمد"],
+      "dispensed_medications": ["Salbutamol", "Fluticasone", "Montelukast"]
+    },
+    {
+      "name": "Omar Mohamed Hatem",
+      "name_variants": ["omar mohamed hatem", "omar mohamed", "omar", "عمر محمد حاتم", "عمر"],
+      "dispensed_medications": ["Azulast phys N. spray", "Lelipel syrup", "Metformin", "Glipizide"]
+    }
+  ],
+  "global_flagged_medications": [
+    "Tramadol",
+    "Codeine",
+    "Oxycodone"
+  ]
+}

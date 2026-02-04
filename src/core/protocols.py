@@ -1,63 +1,30 @@
 """
 Core protocols for dependency inversion.
 
-SOLID Principles:
-- D: Dependency Inversion - depend on abstractions
-- I: Interface Segregation - specific interfaces for each responsibility
+Simplified for LangChain-based validation architecture.
 """
 
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 if TYPE_CHECKING:
-    from src.models.schemas import (
-        ExtractedOCRInput,
-        PrescriptionValidationResponse,
-        ValidationResult,
-    )
+    from src.models.schemas import ExtractedOCRInput, PrescriptionValidationResponse
 
 
 @runtime_checkable
-class ValidatorProtocol(Protocol):
-    """
-    Interface for all validators.
+class ValidationServiceProtocol(Protocol):
+    """Interface for validation service."""
 
-    SOLID: Interface Segregation - each validator only needs to implement validate().
-    """
-
-    async def validate(self, data: "ExtractedOCRInput") -> list["ValidationResult"]:
-        """
-        Validate extracted OCR data and return validation results.
-
-        Args:
-            data: Extracted OCR input data
-
-        Returns:
-            List of validation results for each item checked
-        """
-        ...
-
-
-@runtime_checkable
-class ReportBuilderProtocol(Protocol):
-    """
-    Interface for report building.
-
-    SOLID: Single Responsibility - only builds reports.
-    """
-
-    async def build_report(
+    async def validate_prescription(
         self,
-        data: "ExtractedOCRInput",
-        validation_results: list["ValidationResult"],
-        success_rate: float,
+        ocr_data: "ExtractedOCRInput",
+        job_id: str,
     ) -> "PrescriptionValidationResponse":
         """
-        Build final prescription validation response.
+        Validate prescription data and return structured response.
 
         Args:
-            data: Original extracted OCR input
-            validation_results: Results from all validators
-            success_rate: Percentage of approved items
+            ocr_data: Extracted OCR input data
+            job_id: Job identifier (used as patient ID)
 
         Returns:
             Complete prescription validation response

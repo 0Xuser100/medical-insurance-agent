@@ -3,7 +3,6 @@ FastAPI Application - Medical Insurance Validation API.
 """
 
 import os
-from contextlib import asynccontextmanager
 from uuid import uuid4
 
 from dotenv import load_dotenv
@@ -29,19 +28,10 @@ from src.services.processing_service import ProcessingService
 load_dotenv()
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Application lifespan handler."""
-    print("Starting Medical Insurance Validation API...")
-    yield
-    print("Shutting down...")
-
-
 app = FastAPI(
     title="Medical Insurance Validation API",
     description="AI-powered prescription validation with OCR extraction and rule-based checks.",
     version="0.1.0",
-    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -98,7 +88,7 @@ async def start_processing(
     if not job:
         raise HTTPException(status_code=404, detail=f"Job not found: {request.job_id}")
 
-    if job.status in (JobStatus.EXTRACTING, JobStatus.VALIDATING):
+    if job.status in (JobStatus.EXTRACTING, JobStatus.VALIDATING, JobStatus.AGGREGATING):
         return ProcessResponse(
             job_id=job.id,
             status=job.status,
@@ -146,6 +136,7 @@ async def get_result(
         JobStatus.PROCESSING,
         JobStatus.EXTRACTING,
         JobStatus.VALIDATING,
+        JobStatus.AGGREGATING,
     ):
         return ResultResponse(
             job_id=job.id,

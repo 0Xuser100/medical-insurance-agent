@@ -1,6 +1,5 @@
 """Business logic services."""
 
-from .validation_service import ValidationService
-from .report_builder import ReportBuilder
+from .langchain_validation_service import LangChainValidationService
 
-__all__ = ["ValidationService", "ReportBuilder"]
+__all__ = ["LangChainValidationService"]

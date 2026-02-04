@@ -12,23 +12,23 @@ from pathlib import Path
 
 from loguru import logger
 
-from src.agents.validation_crew import ValidationCrew
 from src.models.schemas import JobStatus
 from src.services.extraction_service import ExtractionService
 from src.services.job_store import InMemoryJobStore, Job
+from src.services.langchain_validation_service import LangChainValidationService
 
 
 class ProcessingService:
     """
     Orchestrates background job processing.
 
-    SOLID: Dependency Inversion - depends on abstractions.
+    Uses LangChain + Gemini for unified validation.
     """
 
     def __init__(
         self,
         job_store: InMemoryJobStore,
-        validation_crew: ValidationCrew,
+        validation_service: LangChainValidationService,
         extraction_service: ExtractionService,
         uploads_dir: Path,
     ):
@@ -37,12 +37,12 @@ class ProcessingService:
 
         Args:
             job_store: Job storage service
-            validation_crew: Validation orchestrator
+            validation_service: LangChain validation service
             extraction_service: Gemini extraction service
             uploads_dir: Directory for uploads and extracted JSONs
         """
         self.job_store = job_store
-        self.validation_crew = validation_crew
+        self.validation_service = validation_service
         self.extraction_service = extraction_service
         self.uploads_dir = uploads_dir
         self._running_tasks: dict[str, asyncio.Task] = {}
@@ -68,14 +68,14 @@ class ProcessingService:
             medications = extracted_data.get("medications", [])
             logger.info(f"Job {job.id}: Extraction complete - {len(medications)} medications found")
 
-            # Phase 2: Validation (Agent waits for extraction to complete)
+            # Phase 2: Validation (LangChain + Gemini)
             logger.info(f"Job {job.id}: Phase 2 - Validation starting")
             job.mark_validating()
             job.extracted_data = extracted_data
             self.job_store.update_job(job)
 
-            # Pass job_id to validation crew for use as patient_id
-            result = await self.validation_crew.validate_prescription(extracted_data, job_id=job.id)
+            # Single LangChain call replaces multi-agent system
+            result = await self.validation_service.validate_prescription(extracted_data, job_id=job.id)
             logger.info(f"Job {job.id}: Validation complete - Status: {result.ai_validation_engine.overall_status.value}")
 
             job.mark_completed(extracted_data=extracted_data, result=result)

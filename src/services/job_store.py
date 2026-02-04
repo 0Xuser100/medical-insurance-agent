@@ -50,6 +50,10 @@ class Job:
         """Mark job as validating."""
         self.status = JobStatus.VALIDATING
 
+    def mark_aggregating(self) -> None:
+        """Mark job as aggregating (LLM synthesis phase)."""
+        self.status = JobStatus.AGGREGATING
+
     def mark_completed(
         self,
         extracted_data: ExtractedOCRInput,

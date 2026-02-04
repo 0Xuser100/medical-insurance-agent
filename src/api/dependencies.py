@@ -1,10 +1,7 @@
 """
 Dependency Injection for FastAPI.
 
-SOLID: Dependency Inversion
-- Provides factory functions for all dependencies
-- Easily extendable to add new validators
-- Configurable via environment variables
+Simplified for LangChain-based validation architecture.
 """
 
 import os
@@ -13,19 +10,12 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from src.agents.validation_crew import ValidationCrew
-from src.core.protocols import ValidatorProtocol
 from src.services.extraction_service import ExtractionService
 from src.services.file_service import FileService
 from src.services.job_store import InMemoryJobStore
+from src.services.langchain_validation_service import LangChainValidationService
 from src.services.processing_service import ProcessingService
-from src.services.report_builder import ReportBuilder
-from src.services.validation_service import ValidationService
-from src.validators.clinical_match import ClinicalMatchValidator
-from src.validators.medication_duration import MedicationDurationValidator
-from src.validators.medication_limit import MedicationLimitValidator
 
-# Load environment variables
 load_dotenv()
 
 
@@ -48,50 +38,13 @@ def get_min_duration_days() -> int:
 
 
 @lru_cache
-def get_validators() -> list[ValidatorProtocol]:
-    """
-    Factory for validators.
-
-    SOLID: Open/Closed Principle
-    - Add new validators here without modifying existing code
-    """
-    return [
-        ClinicalMatchValidator(mappings_path=get_mappings_path()),
-        MedicationLimitValidator(limit=get_medication_limit()),
-        MedicationDurationValidator(min_days=get_min_duration_days()),
-    ]
-
-
-@lru_cache
-def get_validation_service() -> ValidationService:
-    """Get or create the validation service."""
-    return ValidationService(validators=get_validators())
-
-
-@lru_cache
-def get_report_builder() -> ReportBuilder:
-    """Get or create the report builder."""
-    return ReportBuilder()
-
-
-@lru_cache
-def get_validation_crew() -> ValidationCrew:
-    """
-    Get or create the multi-agent validation crew.
-
-    SOLID: Dependency Inversion
-    - ValidationCrew depends on ReportBuilder for final output
-    - Three specialized agents handle validation independently
-    - Pydantic validation happens only at report building stage
-    """
-    return ValidationCrew(
-        report_builder=get_report_builder(),
+def get_validation_service() -> LangChainValidationService:
+    """Get or create the LangChain validation service."""
+    return LangChainValidationService(
+        mappings_path=get_mappings_path(),
+        medication_limit=get_medication_limit(),
+        min_duration_days=get_min_duration_days(),
     )
-
-
-# ============================================================================
-# Async Processing Dependencies
-# ============================================================================
 
 
 @lru_cache
@@ -125,7 +78,7 @@ def get_processing_service() -> ProcessingService:
     """Get or create the processing service."""
     return ProcessingService(
         job_store=get_job_store(),
-        validation_crew=get_validation_crew(),
+        validation_service=get_validation_service(),
         extraction_service=get_extraction_service(),
         uploads_dir=get_uploads_dir(),
     )

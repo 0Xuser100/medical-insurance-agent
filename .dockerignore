@@ -37,6 +37,10 @@ uploads/*
 *.json
 !src/data/*.json
 
+# Docker
+Dockerfile
+docker-compose.yml
+
 # Documentation
 *.md
 !README.md
