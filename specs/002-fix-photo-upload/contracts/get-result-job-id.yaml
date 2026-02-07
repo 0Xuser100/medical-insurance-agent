@@ -1,0 +1,335 @@
+openapi: 3.0.0
+info:
+  title: Medical Insurance Validation API - Job Result Endpoint
+  version: 0.1.0
+  description: Contract definition for GET /result/{job_id} endpoint
+
+paths:
+  /result/{job_id}:
+    get:
+      operationId: getJobResult
+      summary: Retrieve job processing result or current status
+      description: |
+        Polls the status and result of a prescription processing job.
+
+        **Behavior by Job Status**:
+        - UPLOADED/PROCESSING/EXTRACTING/VALIDATING/AGGREGATING: Returns status with "Processing..." message in `error` field
+        - COMPLETED: Returns full result with `extracted_data` and `result` fields populated
+        - FAILED: Returns error message in `error` field
+
+      tags:
+        - Job Processing
+
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          description: Unique job identifier (format "PAT-{12-char-hex}")
+          schema:
+            type: string
+            pattern: '^PAT-[0-9a-f]{12}$'
+            example: "PAT-0b1f01e6dc5f"
+
+      responses:
+        '200':
+          description: Job result or current status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultResponse'
+              examples:
+                processing:
+                  summary: Job still processing
+                  value:
+                    job_id: "PAT-0b1f01e6dc5f"
+                    status: "VALIDATING"
+                    created_at: "2026-02-07T18:37:55.000Z"
+                    started_at: "2026-02-07T18:37:56.000Z"
+                    completed_at: null
+                    error: "Processing... Current stage: VALIDATING"
+                    extracted_data: null
+                    result: null
+
+                completed_approved:
+                  summary: Job completed - prescription approved
+                  value:
+                    job_id: "PAT-0b1f01e6dc5f"
+                    status: "COMPLETED"
+                    created_at: "2026-02-07T18:37:55.000Z"
+                    started_at: "2026-02-07T18:37:56.000Z"
+                    completed_at: "2026-02-07T18:38:18.000Z"
+                    error: null
+                    extracted_data:
+                      patient:
+                        name: "Omar Mohamed Hatem"
+                        age: "6"
+                        gender: "Male"
+                        id: "PAT-0b1f01e6dc5f"
+                      provider:
+                        name: "Dr. Wael Hatem El Taei"
+                        id: "DOC-001"
+                        facility: "Medical Center"
+                      diagnosis:
+                        primary: "Allergic Rhinitis"
+                        icd_code: "J30.1"
+                      medications:
+                        - name: "Azulast phys N. spray"
+                          dosage: "One puff"
+                          frequency: "Twice daily"
+                          duration: "One month"
+                          quantity: "1"
+                      labs: []
+                      date: "2026-02-07"
+                    result:
+                      transaction_id: "REQ-2026-5DD7"
+                      timestamp: "2026-02-07T18:38:18.000Z"
+                      patient_profile:
+                        id: "PAT-0b1f01e6dc5f"
+                        name: "Omar Mohamed Hatem"
+                        age: "6"
+                        gender: "Male"
+                      ai_validation_engine:
+                        overall_status: "APPROVED"
+                        confidence_score: "1.0"
+                        medication_count: "1"
+                        line_items:
+                          - type: "MEDICATION"
+                            item_name: "Azulast phys N. spray"
+                            status: "APPROVED"
+                            ui_badge: "✓ Approved"
+                            risk_level: "LOW"
+                            validation_details:
+                              clinical_match: true
+                              duration_check: "OK"
+                              reason_en: "Clinically appropriate for diagnosis"
+                              reason_ar: "مناسب سريرياً للتشخيص"
+
+                completed_rejected:
+                  summary: Job completed - prescription rejected
+                  value:
+                    job_id: "PAT-0b1f01e6dc5f"
+                    status: "COMPLETED"
+                    created_at: "2026-02-07T18:37:55.000Z"
+                    started_at: "2026-02-07T18:37:56.000Z"
+                    completed_at: "2026-02-07T18:38:18.000Z"
+                    error: null
+                    extracted_data:
+                      patient:
+                        name: "John Doe"
+                        age: "45"
+                        gender: "Male"
+                        id: "PAT-abc123def456"
+                      provider:
+                        name: "Dr. Jane Smith"
+                        id: "DOC-002"
+                        facility: "City Hospital"
+                      diagnosis:
+                        primary: "Diabetes Type 2"
+                        icd_code: "E11.9"
+                      medications:
+                        - name: "Inappropriate Medication"
+                          dosage: "10mg"
+                          frequency: "Once daily"
+                          duration: "3 months"
+                          quantity: "90"
+                      labs: []
+                      date: "2026-02-07"
+                    result:
+                      transaction_id: "REQ-2026-8ABC"
+                      timestamp: "2026-02-07T18:38:18.000Z"
+                      patient_profile:
+                        id: "PAT-abc123def456"
+                        name: "John Doe"
+                        age: "45"
+                        gender: "Male"
+                      ai_validation_engine:
+                        overall_status: "REJECTED"
+                        confidence_score: "0.85"
+                        medication_count: "1"
+                        line_items:
+                          - type: "MEDICATION"
+                            item_name: "Inappropriate Medication"
+                            status: "REJECTED"
+                            ui_badge: "✗ Rejected"
+                            risk_level: "HIGH"
+                            validation_details:
+                              clinical_match: false
+                              duration_check: "WARNING"
+                              reason_en: "Not clinically appropriate for diagnosis"
+                              reason_ar: "غير مناسب سريرياً للتشخيص"
+
+                failed:
+                  summary: Job failed during processing
+                  value:
+                    job_id: "PAT-0b1f01e6dc5f"
+                    status: "FAILED"
+                    created_at: "2026-02-07T18:37:55.000Z"
+                    started_at: "2026-02-07T18:37:56.000Z"
+                    completed_at: "2026-02-07T18:38:00.000Z"
+                    error: "OCR extraction failed: Unable to read image"
+                    extracted_data: null
+                    result: null
+
+        '404':
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  detail:
+                    type: string
+                    example: "Job not found: PAT-invalid123"
+
+components:
+  schemas:
+    JobStatus:
+      type: string
+      enum:
+        - UPLOADED
+        - PROCESSING
+        - EXTRACTING
+        - VALIDATING
+        - AGGREGATING
+        - COMPLETED
+        - FAILED
+      description: Current status of the processing job
+
+    ResultResponse:
+      type: object
+      required:
+        - job_id
+        - status
+        - created_at
+      properties:
+        job_id:
+          type: string
+          description: Unique job identifier
+          pattern: '^PAT-[0-9a-f]{12}$'
+          example: "PAT-0b1f01e6dc5f"
+
+        status:
+          $ref: '#/components/schemas/JobStatus'
+
+        created_at:
+          type: string
+          format: date-time
+          description: Job creation timestamp
+          example: "2026-02-07T18:37:55.000Z"
+
+        started_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Processing start timestamp (null if not started)
+          example: "2026-02-07T18:37:56.000Z"
+
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Processing completion timestamp (null if not completed)
+          example: "2026-02-07T18:38:18.000Z"
+
+        error:
+          type: string
+          nullable: true
+          description: |
+            - If status is FAILED: Contains error message
+            - If status is PROCESSING/EXTRACTING/VALIDATING/AGGREGATING: Contains "Processing... Current stage: {status}"
+            - If status is COMPLETED: null
+          example: "Processing... Current stage: VALIDATING"
+
+        extracted_data:
+          type: object
+          nullable: true
+          description: Extracted prescription data (only present when COMPLETED)
+          properties:
+            patient:
+              type: object
+              properties:
+                name: { type: string }
+                age: { type: string }
+                gender: { type: string }
+                id: { type: string }
+            provider:
+              type: object
+              properties:
+                name: { type: string }
+                id: { type: string }
+                facility: { type: string }
+            diagnosis:
+              type: object
+              properties:
+                primary: { type: string }
+                icd_code: { type: string }
+            medications:
+              type: array
+              items:
+                type: object
+                properties:
+                  name: { type: string }
+                  dosage: { type: string }
+                  frequency: { type: string }
+                  duration: { type: string }
+                  quantity: { type: string }
+            labs:
+              type: array
+              items:
+                type: object
+                properties:
+                  name: { type: string }
+                  type: { type: string }
+            date: { type: string }
+
+        result:
+          type: object
+          nullable: true
+          description: Validation result (only present when COMPLETED)
+          properties:
+            transaction_id:
+              type: string
+              example: "REQ-2026-5DD7"
+            timestamp:
+              type: string
+              format: date-time
+            patient_profile:
+              type: object
+              properties:
+                id: { type: string }
+                name: { type: string }
+                age: { type: string }
+                gender: { type: string }
+            ai_validation_engine:
+              type: object
+              properties:
+                overall_status:
+                  type: string
+                  enum: [APPROVED, REJECTED]
+                confidence_score:
+                  type: string
+                medication_count:
+                  type: string
+                line_items:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      type:
+                        type: string
+                        enum: [MEDICATION, LAB_ANALYSIS]
+                      item_name: { type: string }
+                      status:
+                        type: string
+                        enum: [APPROVED, REJECTED]
+                      ui_badge: { type: string }
+                      risk_level:
+                        type: string
+                        enum: [LOW, MEDIUM, HIGH]
+                      validation_details:
+                        type: object
+                        properties:
+                          clinical_match: { type: boolean }
+                          duration_check: { type: string, nullable: true }
+                          reason_en: { type: string }
+                          reason_ar: { type: string }

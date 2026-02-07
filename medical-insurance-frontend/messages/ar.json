@@ -1,0 +1,77 @@
+{
+  "app": {
+    "title": "ميديسكان AI",
+    "subtitle": "وكيل تحليل الوصفات الطبية"
+  },
+  "nav": {
+    "home": "الرئيسية",
+    "prescriptions": "الوصفات"
+  },
+  "upload": {
+    "title": "تحليل وصفة طبية جديدة",
+    "subtitle": "ارفع صورة وصفة طبية أو ملف PDF للتحقق بواسطة الذكاء الاصطناعي",
+    "dragDrop": "اسحب وأفلت الوصفة الطبية هنا",
+    "or": "أو",
+    "browse": "تصفح الملفات",
+    "maxSize": "الحد الأقصى 10 ميجابايت — JPEG, PNG, GIF, WebP, TIFF, أو PDF",
+    "uploading": "جاري رفع الوصفة...",
+    "processing": "بدء التحليل...",
+    "errorInvalidType": "نوع الملف غير صالح. يرجى رفع JPEG أو PNG أو GIF أو WebP أو TIFF أو PDF.",
+    "errorTooLarge": "الملف كبير جداً. الحد الأقصى هو 10 ميجابايت.",
+    "errorUploadFailed": "فشل الرفع. يرجى المحاولة مرة أخرى.",
+    "errorNetwork": "خطأ في الشبكة. يرجى التحقق من اتصالك والمحاولة مرة أخرى."
+  },
+  "status": {
+    "title": "معالجة الوصفة الطبية",
+    "uploaded": "تم الرفع — في انتظار البدء...",
+    "extracting": "جاري استخراج بيانات الوصفة...",
+    "validating": "جاري التحقق من الأدوية...",
+    "completed": "اكتمل التحليل!",
+    "failed": "فشلت المعالجة",
+    "retry": "إعادة المحاولة",
+    "viewResults": "عرض النتائج"
+  },
+  "result": {
+    "title": "تحليل الوصفة الطبية",
+    "scannedFrom": "تم المسح من الصورة المرفوعة",
+    "patientInfo": "معلومات المريض",
+    "diagnosisTitle": "التشخيصات المستخرجة",
+    "medicationTitle": "التحقق من الأدوية",
+    "labTitle": "التحاليل والفحوصات المطلوبة",
+    "providerTitle": "معلومات مقدم الخدمة",
+    "aiInsight": "رؤية الذكاء الاصطناعي",
+    "overallApproved": "الوصفة الطبية مُوافَق عليها",
+    "overallRejected": "الوصفة تحتوي على {count} أدوية، جميعها مرفوضة",
+    "overallPartial": "الوصفة تحتوي على {approved} موافق عليها و {rejected} مرفوضة",
+    "approved": "موافق عليه",
+    "rejected": "مرفوض",
+    "riskHigh": "خطورة عالية",
+    "riskMedium": "خطورة متوسطة",
+    "riskLow": "خطورة منخفضة",
+    "confidenceScore": "درجة الثقة",
+    "medicationCount": "الأدوية",
+    "transactionId": "رقم المعاملة",
+    "timestamp": "تاريخ المعالجة",
+    "viewOriginal": "عرض الوصفة الأصلية",
+    "confirmSign": "تأكيد وتوقيع",
+    "notFound": "غير موجود",
+    "labName": "الاسم",
+    "labType": "النوع"
+  },
+  "error": {
+    "title": "حدث خطأ ما",
+    "description": "حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى.",
+    "retry": "حاول مرة أخرى",
+    "notFound": "الصفحة غير موجودة",
+    "notFoundDescription": "الصفحة التي تبحث عنها غير موجودة.",
+    "goHome": "العودة للرئيسية",
+    "jobNotFound": "لم يتم العثور على المهمة. ربما تم حذف الوصفة.",
+    "networkError": "خطأ في الشبكة. يرجى التحقق من اتصالك."
+  },
+  "common": {
+    "loading": "جاري التحميل...",
+    "years": "سنة",
+    "male": "ذكر",
+    "female": "أنثى"
+  }
+}

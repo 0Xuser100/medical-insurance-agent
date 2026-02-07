@@ -1,0 +1,33 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #0A6E31;
+  --color-primary-foreground: #FFFFFF;
+  --color-destructive: #C41E3A;
+  --color-destructive-foreground: #FFFFFF;
+  --color-success: #10B981;
+  --color-success-foreground: #FFFFFF;
+  --color-warning: #F59E0B;
+  --color-warning-foreground: #1A1A1A;
+  --color-muted: #6B7280;
+  --color-muted-foreground: #9CA3AF;
+  --color-card: #FFFFFF;
+  --color-card-foreground: #1A1A1A;
+  --color-border: #E5E7EB;
+  --color-background: #F9FAFB;
+  --color-foreground: #111827;
+}
+
+body {
+  font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+
+[dir="rtl"] body {
+  font-family: "Tajawal", "Segoe UI", system-ui, sans-serif;
+}
+
+/* Focus indicators for WCAG 2.1 AA */
+*:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}

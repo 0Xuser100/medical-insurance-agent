@@ -1,25 +1,43 @@
-# Medical Insurance Validation API
+# Medical Insurance Validation System
 
-AI-powered prescription validation system that processes prescription images/PDFs and generates structured approval/rejection reports with bilingual reasons (EN/AR) and Human-in-the-Loop review.
+AI-powered prescription validation system with a **Next.js frontend** and **FastAPI backend** that processes prescription images/PDFs and generates structured approval/rejection reports with bilingual support (EN/AR) and real-time status tracking.
 
 ---
 
 ## Quick Start
 
-### Option 1: Local Development
+### Full Stack (Backend + Frontend)
 
+**Backend (FastAPI)**
 ```bash
 # 1. Install dependencies
 uv sync
 
-# 2. Configure environment (see Configuration section)
-cp .env.example .env  # Edit with your API keys
+# 2. Configure environment
+cp .env.example .env  # Edit with your Gemini API key
 
-# 3. Run server
+# 3. Run backend
 uv run uvicorn src.api.main:app --reload
+# API available at: http://localhost:8000
 ```
 
-### Option 2: Docker
+**Frontend (Next.js)**
+```bash
+# 1. Navigate to frontend
+cd medical-insurance-frontend
+
+# 2. Install dependencies
+npm install
+
+# 3. Configure environment
+echo "NEXT_PUBLIC_API_URL=http://localhost:8000" > .env.local
+
+# 4. Run dev server
+npm run dev
+# Frontend available at: http://localhost:3000
+```
+
+### Docker (Backend Only)
 
 ```bash
 # 1. Configure environment
@@ -32,26 +50,38 @@ docker compose up --build
 docker compose down
 ```
 
-**After changing source code**, rebuild and restart:
-
-```bash
-docker compose up --build
-```
-
-API available at: `http://localhost:8000/docs`
+**Access Points:**
+- **Frontend**: http://localhost:3000 (English) | http://localhost:3000/ar (Arabic)
+- **Backend API**: http://localhost:8000/docs (Swagger UI)
 
 
 
 ## Architecture
 
-The system uses a **LangChain + Gemini** pipeline that replaces the previous CrewAI multi-agent approach with a single unified LLM call using Gemini's native structured output.
+### Full Stack Overview
 
 ```
-┌─────────────┐     ┌─────────────┐     ┌──────────────────┐     ┌─────────────┐
-│   UPLOAD    │────▶│   EXTRACT   │────▶│    VALIDATE      │────▶│   RESULT    │
-│  Image/PDF  │     │ Gemini OCR  │     │ LangChain+Gemini │     │    JSON     │
-│             │     │ (GenAI SDK) │     │ Structured Output│     │ (Bilingual) │
-└─────────────┘     └─────────────┘     └──────────────────┘     └─────────────┘
+┌──────────────────────────────────────────────────────────────────────┐
+│                        FRONTEND (Next.js 16)                          │
+│  ┌───────────────┐  ┌──────────────┐  ┌───────────────────────────┐ │
+│  │ Upload Zone   │─▶│ Status Track │─▶│  Results Display          │ │
+│  │ Drag & Drop   │  │ Auto-Polling │  │  • Patient Info           │ │
+│  │ File Validate │  │ Progress UI  │  │  • Medications (badges)   │ │
+│  └───────────────┘  └──────────────┘  │  • Labs, Diagnosis        │ │
+│                                        │  • Bilingual (EN/AR + RTL)│ │
+│  React Query • next-intl • Zustand    └───────────────────────────┘ │
+└─────────────────────────────┬────────────────────────────────────────┘
+                              │ REST API
+┌─────────────────────────────▼────────────────────────────────────────┐
+│                       BACKEND (FastAPI)                               │
+│  ┌─────────────┐   ┌─────────────┐   ┌──────────────────┐           │
+│  │   UPLOAD    │──▶│   EXTRACT   │──▶│    VALIDATE      │           │
+│  │  Image/PDF  │   │ Gemini OCR  │   │ LangChain+Gemini │           │
+│  │  Job Store  │   │ (GenAI SDK) │   │ Structured Output│           │
+│  └─────────────┘   └─────────────┘   └──────────────────┘           │
+│                                                                       │
+│  FastAPI • Pydantic • async/await • LangChain                        │
+└───────────────────────────────────────────────────────────────────────┘
 ```
 
 ### Processing Pipeline
@@ -63,6 +93,130 @@ The system uses a **LangChain + Gemini** pipeline that replaces the previous Cre
    - Medication Limit Check (>5 medications triggers review)
    - Duration Check (refill interval validation, placeholder for MVP)
 4. **Result** - Structured JSON with line-item approvals/rejections, bilingual reasons (EN/AR), and UI badges
+
+---
+
+## Frontend Features
+
+### Tech Stack
+
+| Component | Technology |
+|-----------|------------|
+| Framework | Next.js 16 (App Router, Turbopack) |
+| UI | React 19, Tailwind CSS v4 |
+| State | TanStack Query (server), Zustand (client) |
+| i18n | next-intl (EN/AR with RTL) |
+| Forms | react-dropzone |
+| Validation | Zod v4 (runtime schema validation) |
+| Type Safety | TypeScript (strict mode) |
+
+### Core Features
+
+**✅ Upload Prescription** (`/`)
+- Drag & drop or browse file selection
+- File validation (JPEG, PNG, GIF, WebP, TIFF, PDF, max 10MB)
+- Auto-upload → process → redirect flow
+- Error handling with user feedback
+
+**✅ Status Tracking** (`/prescriptions/status`)
+- Real-time progress indicators (UPLOADED → EXTRACTING → VALIDATING → COMPLETED)
+- Auto-polling every 3 seconds (stops on completion/failure)
+- Retry on failure
+- Auto-navigation to results on completion
+
+**✅ Results Display** (`/prescriptions/[jobId]`)
+- Overall validation status with confidence score
+- Patient information card with avatar
+- Medication cards with:
+  - Approval/rejection badges
+  - Risk level indicators (LOW/MEDIUM/HIGH)
+  - Bilingual AI reasoning (EN/AR)
+  - Clinical match indicators
+- Extracted diagnosis and labs
+- Provider information
+- Transaction ID and timestamp
+
+**✅ Bilingual Support**
+- Full English and Arabic translations
+- RTL layout for Arabic (`/ar` routes)
+- Language switcher in header (EN/AR)
+- Locale-aware formatting
+
+**✅ Accessibility**
+- WCAG 2.1 AA compliant focus indicators
+- Semantic HTML with ARIA labels
+- Keyboard navigation support
+- Loading states and error boundaries
+
+### Frontend Structure
+
+```
+medical-insurance-frontend/
+├── app/[locale]/                       # Next.js App Router
+│   ├── layout.tsx                      # Root layout (i18n + RTL)
+│   ├── page.tsx                        # Home (upload)
+│   ├── error.tsx                       # Error boundary
+│   ├── not-found.tsx                   # 404 page
+│   └── prescriptions/
+│       ├── [jobId]/
+│       │   ├── page.tsx                # Results page
+│       │   └── loading.tsx             # Loading skeleton
+│       └── status/
+│           └── page.tsx                # Status tracker
+├── components/
+│   ├── features/
+│   │   ├── upload/UploadZone.tsx       # Drag & drop upload
+│   │   ├── prescription/               # Result display components
+│   │   │   ├── ResultCard.tsx          # Overall summary
+│   │   │   ├── PatientHeader.tsx       # Patient info
+│   │   │   ├── MedicationCard.tsx      # Line item card
+│   │   │   ├── DiagnosisCard.tsx       # Diagnosis display
+│   │   │   ├── LabsCard.tsx            # Labs table
+│   │   │   ├── ProviderCard.tsx        # Provider info
+│   │   │   ├── StatusBadge.tsx         # Status/risk badges
+│   │   │   └── ResultSkeleton.tsx      # Loading state
+│   │   └── layout/                     # Layout components
+│   │       ├── Header.tsx              # App header
+│   │       ├── Footer.tsx              # App footer
+│   │       └── LanguageSwitcher.tsx    # EN/AR toggle
+│   └── providers/
+│       └── QueryProvider.tsx           # TanStack Query wrapper
+├── lib/
+│   ├── api/
+│   │   ├── client.ts                   # Fetch wrapper
+│   │   ├── queries.ts                  # useJobResult, useJobStatus
+│   │   └── mutations.ts                # useUploadPrescription, useProcessJob
+│   ├── schemas/validation.ts           # Zod schemas (mirror backend)
+│   ├── stores/useLanguageStore.ts      # Zustand locale store
+│   └── utils/
+│       ├── cn.ts                       # Tailwind class merger
+│       └── formatters.ts               # Date, confidence formatters
+├── i18n/
+│   ├── routing.ts                      # Locale config
+│   ├── request.ts                      # Server-side i18n
+│   └── navigation.ts                   # Client-side navigation
+├── messages/
+│   ├── en.json                         # English translations
+│   └── ar.json                         # Arabic translations
+├── styles/globals.css                  # Tailwind v4 + theme tokens
+├── middleware.ts                       # next-intl middleware
+├── next.config.ts                      # Next.js config
+├── tsconfig.json                       # TypeScript config
+├── package.json                        # Dependencies
+└── .env.local                          # Environment (NEXT_PUBLIC_API_URL)
+```
+
+### Development Commands
+
+```bash
+cd medical-insurance-frontend
+
+npm run dev         # Start dev server (http://localhost:3000)
+npm run build       # Production build
+npm run start       # Production server
+npm run lint        # ESLint
+npm run type-check  # TypeScript validation
+```
 
 ---
 
@@ -121,7 +275,27 @@ Validates refill intervals (minimum 14 days between same medication). Currently 
 
 ```
 medical-insurance-agent/
-├── src/
+├── medical-insurance-frontend/             # Next.js 16 Frontend
+│   ├── app/[locale]/                       # Next.js App Router (locale-aware)
+│   ├── components/                         # React components
+│   │   ├── features/                       # Feature components (upload, prescription, layout)
+│   │   └── providers/                      # Context providers (QueryProvider)
+│   ├── lib/                                # Business logic
+│   │   ├── api/                            # API client (queries, mutations)
+│   │   ├── schemas/                        # Zod validation schemas
+│   │   ├── stores/                         # Zustand stores
+│   │   └── utils/                          # Utilities (formatters, cn)
+│   ├── i18n/                               # Internationalization (routing, request, navigation)
+│   ├── messages/                           # Translations (en.json, ar.json)
+│   ├── styles/                             # Tailwind CSS v4
+│   ├── public/                             # Static assets
+│   ├── next.config.ts                      # Next.js configuration
+│   ├── middleware.ts                       # next-intl middleware
+│   ├── tsconfig.json                       # TypeScript config
+│   ├── package.json                        # npm dependencies
+│   └── .env.local                          # Environment (NEXT_PUBLIC_API_URL)
+│
+├── src/                                    # FastAPI Backend
 │   ├── __init__.py
 │   ├── api/
 │   │   ├── __init__.py
@@ -145,17 +319,77 @@ medical-insurance-agent/
 │   │   └── aggregator_prompt.py            # Unified validation prompt template
 │   └── data/
 │       └── diagnosis_mappings.json         # ICD-10 → valid medications/labs
-├── tests/
+│
+├── tests/                                  # Backend tests
 │   ├── __init__.py
 │   ├── test_api_schema.py                  # API endpoint schema tests
 │   └── test_validators.py                  # Validator tests
+│
+├── specs/                                  # Speckit feature specifications
+│   └── 001-prescription-ui/                # Frontend spec (v1.0.0)
+│       ├── spec.md                         # User stories and requirements
+│       ├── plan.md                         # Implementation plan
+│       ├── tasks.md                        # 90 tasks across 8 phases
+│       ├── research.md                     # Technology research
+│       ├── data-model.md                   # TypeScript/Zod schemas
+│       ├── quickstart.md                   # Developer setup guide
+│       └── contracts/                      # API contracts
+│
+├── .specify/                               # Speckit framework
+│   └── memory/
+│       └── constitution.md                 # Project constitution (5 principles)
+│
 ├── uploads/                                # Uploaded files (runtime)
 ├── Dockerfile                              # Multi-stage build (uv + Python 3.12)
 ├── docker-compose.yml                      # Container orchestration
 ├── pyproject.toml                          # uv project config
-├── .env.example                            # Environment template
-└── LLM_AGGREGATOR_README.md                # LLM aggregation layer docs
+├── .env.example                            # Backend environment template
+└── README.md                               # This file
 ```
+
+---
+
+## Development Workflow
+
+### Running Both Backend + Frontend
+
+**Terminal 1 - Backend:**
+```bash
+# From project root
+uv run uvicorn src.api.main:app --reload
+# Backend running at http://localhost:8000
+```
+
+**Terminal 2 - Frontend:**
+```bash
+# From project root
+cd medical-insurance-frontend
+npm run dev
+# Frontend running at http://localhost:3000
+```
+
+### Testing the Complete Flow
+
+1. **Open Frontend**: http://localhost:3000
+2. **Upload**: Drag & drop a prescription image (JPEG/PNG/PDF)
+3. **Track**: Auto-redirected to status page with progress indicators
+4. **View Results**: Auto-navigate to results when processing completes
+5. **Switch Language**: Use EN/AR toggle in header (RTL layout for Arabic)
+
+### API Integration
+
+The frontend uses these environment variables:
+
+```env
+# medical-insurance-frontend/.env.local
+NEXT_PUBLIC_API_URL=http://localhost:8000
+```
+
+The frontend automatically:
+- Uploads files to `/upload`
+- Triggers processing via `/process`
+- Polls status via `/job/{job_id}` every 3 seconds
+- Fetches final results from `/result/{job_id}`
 
 ---
 
@@ -244,7 +478,51 @@ UPLOADED ──► EXTRACTING ──► VALIDATING ──► COMPLETED
 
 ---
 
-## Client Integration (JavaScript)
+## Client Integration
+
+### Official Frontend
+
+This project includes a production-ready **Next.js frontend** in `medical-insurance-frontend/`.
+
+See the [Frontend Features](#frontend-features) section above for details.
+
+### Custom Integration (JavaScript/TypeScript)
+
+If building a custom client, use this integration pattern:
+
+```typescript
+// Using TanStack Query (recommended - from our Next.js frontend)
+import { useMutation, useQuery } from "@tanstack/react-query";
+
+// 1. Upload mutation
+const uploadMutation = useMutation({
+  mutationFn: async (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await fetch("http://localhost:8000/upload", {
+      method: "POST",
+      body: formData,
+    });
+    return res.json();
+  },
+});
+
+// 2. Status polling query
+const { data } = useQuery({
+  queryKey: ["job-status", jobId],
+  queryFn: async () => {
+    const res = await fetch(`http://localhost:8000/job/${jobId}`);
+    return res.json();
+  },
+  refetchInterval: (query) => {
+    const status = query.state.data?.status;
+    if (status === "COMPLETED" || status === "FAILED") return false;
+    return 3000; // Poll every 3 seconds
+  },
+});
+```
+
+**Vanilla JavaScript:**
 
 ```javascript
 // 1. Upload
@@ -265,13 +543,15 @@ let result;
 while (true) {
   result = await fetch(`/result/${job_id}`).then(r => r.json());
   if (['COMPLETED', 'FAILED'].includes(result.status)) break;
-  await new Promise(r => setTimeout(r, 1000));
+  await new Promise(r => setTimeout(r, 3000)); // Poll every 3s
 }
 ```
 
 ---
 
 ## Technology Stack
+
+### Backend
 
 | Component | Technology |
 |-----------|------------|
@@ -284,9 +564,26 @@ while (true) {
 | Container | Docker (multi-stage, non-root) |
 | Python | 3.12+ |
 
+### Frontend
+
+| Component | Technology |
+|-----------|------------|
+| Framework | Next.js 16 (App Router, Turbopack) |
+| UI Library | React 19 |
+| Styling | Tailwind CSS v4 |
+| State Management | TanStack Query v5 (server), Zustand v5 (client) |
+| i18n | next-intl v4 (EN/AR with RTL) |
+| Forms | react-dropzone v14 |
+| Validation | Zod v4 |
+| Type Safety | TypeScript 5.9 (strict mode) |
+| Package Manager | npm |
+| Build Tool | Turbopack (Next.js 16) |
+
 ---
 
 ## Key Dependencies
+
+### Backend
 
 | Package | Purpose |
 |---------|---------|
@@ -297,3 +594,17 @@ while (true) {
 | `loguru` | Structured logging |
 | `aiofiles` | Async file I/O |
 | `uvicorn` | ASGI server |
+
+### Frontend
+
+| Package | Purpose |
+|---------|---------|
+| `next` | React framework with App Router |
+| `react` + `react-dom` | UI library |
+| `@tanstack/react-query` | Server state management with auto-polling |
+| `next-intl` | Internationalization (i18n) with locale routing |
+| `zustand` | Client state management |
+| `zod` | Runtime schema validation |
+| `react-dropzone` | File upload with drag & drop |
+| `tailwindcss` | Utility-first CSS framework |
+| `clsx` + `tailwind-merge` | Conditional class name utilities |

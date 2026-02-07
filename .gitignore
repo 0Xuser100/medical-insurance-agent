@@ -16,5 +16,13 @@ wheels/
 
 uploads
 
+# Node.js
+node_modules/
 
+# IDE
+.vscode/
+.idea/
 
+# OS
+.DS_Store
+Thumbs.db
