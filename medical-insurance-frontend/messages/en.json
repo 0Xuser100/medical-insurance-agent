@@ -1,0 +1,77 @@
+{
+  "app": {
+    "title": "MediScan AI",
+    "subtitle": "Prescription Analysis Agent"
+  },
+  "nav": {
+    "home": "Home",
+    "prescriptions": "Prescriptions"
+  },
+  "upload": {
+    "title": "New Prescription Analysis",
+    "subtitle": "Upload a prescription image or PDF for AI-powered validation",
+    "dragDrop": "Drag & drop your prescription here",
+    "or": "or",
+    "browse": "Browse Files",
+    "maxSize": "Max 10MB — JPEG, PNG, GIF, WebP, TIFF, or PDF",
+    "uploading": "Uploading prescription...",
+    "processing": "Starting analysis...",
+    "errorInvalidType": "Invalid file type. Please upload JPEG, PNG, GIF, WebP, TIFF, or PDF.",
+    "errorTooLarge": "File is too large. Maximum size is 10MB.",
+    "errorUploadFailed": "Upload failed. Please try again.",
+    "errorNetwork": "Network error. Please check your connection and try again."
+  },
+  "status": {
+    "title": "Processing Prescription",
+    "uploaded": "Uploaded — Waiting to start...",
+    "extracting": "Extracting prescription data...",
+    "validating": "Validating medications...",
+    "completed": "Analysis complete!",
+    "failed": "Processing failed",
+    "retry": "Retry",
+    "viewResults": "View Results"
+  },
+  "result": {
+    "title": "Prescription Analysis",
+    "scannedFrom": "Scanned from Uploaded Image",
+    "patientInfo": "Patient Information",
+    "diagnosisTitle": "Extracted Diagnoses",
+    "medicationTitle": "Medication Validation",
+    "labTitle": "Analysis & Lab Requests",
+    "providerTitle": "Provider Information",
+    "aiInsight": "AI Insight",
+    "overallApproved": "The prescription is APPROVED",
+    "overallRejected": "The prescription contains {count} medications, all are REJECTED",
+    "overallPartial": "The prescription has {approved} approved and {rejected} rejected items",
+    "approved": "Approved",
+    "rejected": "Rejected",
+    "riskHigh": "High Risk",
+    "riskMedium": "Medium Risk",
+    "riskLow": "Low Risk",
+    "confidenceScore": "Confidence Score",
+    "medicationCount": "Medications",
+    "transactionId": "Transaction ID",
+    "timestamp": "Processed At",
+    "viewOriginal": "View Original Prescription",
+    "confirmSign": "Confirm & Sign",
+    "notFound": "not found",
+    "labName": "Name",
+    "labType": "Type"
+  },
+  "error": {
+    "title": "Something went wrong",
+    "description": "An unexpected error occurred. Please try again.",
+    "retry": "Try Again",
+    "notFound": "Page not found",
+    "notFoundDescription": "The page you are looking for does not exist.",
+    "goHome": "Go Home",
+    "jobNotFound": "Job not found. The prescription may have been deleted.",
+    "networkError": "Network error. Please check your connection."
+  },
+  "common": {
+    "loading": "Loading...",
+    "years": "yrs",
+    "male": "Male",
+    "female": "Female"
+  }
+}
