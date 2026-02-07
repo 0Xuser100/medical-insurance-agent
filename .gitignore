@@ -11,10 +11,10 @@ wheels/
 
 # Secrets & credentials
 .env
-*-*-*.json
-astrik-*.json
-.claude
+# *-*-*.json
+# astrik-*.json
+
 uploads
 
 
-.specify
+
