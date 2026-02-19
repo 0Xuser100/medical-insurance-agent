@@ -153,7 +153,7 @@ class ExtractionService:
             raise ValueError("GEMINI_API_KEY environment variable not set")
 
         self.client = genai.Client(api_key=api_key)
-        self.model = model or os.environ.get("GEMINI_MODEL_NAME", "gemini-3-flash-preview")
+        self.model = model or os.environ.get("GEMINI_OCR_MODEL")
         logger.info(f"ExtractionService initialized with model: {self.model}")
 
     def _get_mime_type(self, file_path: Path) -> str:
