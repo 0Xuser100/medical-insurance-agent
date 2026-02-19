@@ -76,7 +76,7 @@ class LangChainValidationService:
         medication_limit: int | None = None,
         min_duration_days: int | None = None,
     ):
-        self.model_name = model_name or "gemini-2.5-flash-preview-09-2025"
+        self.model_name = model_name or "gemini-2.5-flash"
         self.medication_limit = medication_limit or int(os.getenv("MEDICATION_LIMIT", "5"))
         self.min_duration_days = min_duration_days or int(os.getenv("MIN_DURATION_DAYS", "14"))
 
