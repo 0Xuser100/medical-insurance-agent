@@ -1,5 +1,7 @@
 # Medical Insurance Validation System
 
+![SmartClaim — AI Medical Insurance Claim Validation](assets/banner.webp)
+
 AI-powered prescription validation system with a **Next.js frontend** and **FastAPI backend** that processes prescription images/PDFs and generates structured approval/rejection reports with bilingual support (EN/AR) and real-time status tracking.
 
 ---
